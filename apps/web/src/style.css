@@ -441,8 +441,8 @@ footer{max-width:1264px;margin:auto;border-top:1px solid #e0e5da;padding:20px 0 
 @keyframes loader-car{from{transform:translateX(-68px)}to{transform:translateX(68px)}}
 @keyframes loader-out{to{opacity:0;visibility:hidden;pointer-events:none}}
 
-body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:linear-gradient(#f8f9f5d9,#f8f9f5d9),linear-gradient(90deg,transparent 0 43%,#cbd8c7 43% 57%,transparent 57%);backdrop-filter:blur(4px)}
-body:has(.search-button:disabled)::after{content:'🚌';position:fixed;z-index:91;left:50%;top:50%;display:grid;place-items:center;width:62px;height:62px;border-radius:18px;background:#be1830;color:white;font-size:31px;line-height:1;box-shadow:0 16px 35px #74203240;transform:translate(-50%,-50%);animation:route-bus-moving 1.35s cubic-bezier(.55,0,.45,1) infinite}
+body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:linear-gradient(#f8f9f5d9,#f8f9f5d9),linear-gradient(90deg,transparent 0 43%,#f0bdc8 43% 57%,transparent 57%);backdrop-filter:blur(4px)}
+body:has(.search-button:disabled)::after{content:'';position:fixed;z-index:91;left:50%;top:50%;width:76px;height:44px;border:3px solid #8e1027;border-radius:12px 12px 8px 8px;background:radial-gradient(circle at 18px 37px,#273d33 0 5px,#f8f9f5 5.5px 7px,transparent 7.5px),radial-gradient(circle at 58px 37px,#273d33 0 5px,#f8f9f5 5.5px 7px,transparent 7.5px),linear-gradient(90deg,transparent 10px,#fff1f3 10px 29px,transparent 29px 33px,#fff1f3 33px 55px,transparent 55px),linear-gradient(#d82b45,#be1830);box-shadow:0 16px 35px #74203240;transform:translate(-50%,-50%);animation:route-bus-moving 1.35s cubic-bezier(.55,0,.45,1) infinite}
 @keyframes route-bus-moving{0%{transform:translate(calc(-50% - 118px),-50%)}45%{transform:translate(calc(-50% + 118px),-50%)}50%{transform:translate(calc(-50% + 118px),-50%) scaleX(-1)}95%,100%{transform:translate(calc(-50% - 118px),-50%) scaleX(-1)}}
 
 
