@@ -441,6 +441,11 @@ footer{max-width:1264px;margin:auto;border-top:1px solid #e0e5da;padding:20px 0 
 @keyframes loader-car{from{transform:translateX(-68px)}to{transform:translateX(68px)}}
 @keyframes loader-out{to{opacity:0;visibility:hidden;pointer-events:none}}
 
+body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:#f8f9f5cc;backdrop-filter:blur(4px)}
+body:has(.search-button:disabled)::after{content:'Preparando tu recorrido';position:fixed;z-index:91;left:50%;top:50%;min-width:240px;padding:18px 24px 18px 58px;border-radius:15px;background:linear-gradient(90deg,#24392f,#31513f,#24392f);background-size:200% 100%;color:white;font-weight:700;box-shadow:0 18px 45px #24392f38;transform:translate(-50%,-50%);animation:route-loader-shine 1.25s ease-in-out infinite}
+body:has(.search-button:disabled)::after{background-image:radial-gradient(circle at 31px 50%,#fff 0 5px,transparent 6px),linear-gradient(90deg,#24392f,#31513f,#24392f)}
+@keyframes route-loader-shine{50%{background-position:100% 0;box-shadow:0 22px 52px #24392f4d}}
+
 
 
 @media(min-width:1450px){main{padding-top:55px}
@@ -986,4 +991,4 @@ html[data-system='metrobus'][data-theme='dark'] body{background:#1c1216}html[dat
 
 @keyframes section-arrival{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
-@media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active,.loader-mark,.loader-route:after,.loader-route span{animation:none}}
+@media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active,.loader-mark,.loader-route:after,.loader-route span,body:has(.search-button:disabled)::after{animation:none}}
