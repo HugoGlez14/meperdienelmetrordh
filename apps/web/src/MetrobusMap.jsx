@@ -7,6 +7,10 @@ const W=1368,H=1824;
 const asPoints=points=>points.map(point=>point.join(',')).join(' ');
 const routeViewBox=points=>{if(!points.length)return `0 0 ${W} ${H}`;const xs=points.map(point=>point[0]),ys=points.map(point=>point[1]),minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys),pad=Math.max(105,Math.min(230,Math.max(maxX-minX,maxY-minY)*.22));return `${Math.max(0,minX-pad)} ${Math.max(0,minY-pad)} ${Math.min(W,maxX-minX+pad*2)} ${Math.min(H,maxY-minY+pad*2)}`};
 const overlaps=(a,b)=>a.left<b.right+12&&a.right>b.left-12&&a.top<b.bottom+12&&a.bottom>b.top-12;
+const networkSegments=metrobusLines.flatMap(line=>{const points=linePoints(line);return points.slice(1).map((point,index)=>[points[index],point])});
+const pointInBox=([x,y],box)=>x>=box.left&&x<=box.right&&y>=box.top&&y<=box.bottom;
+const crosses=(a,b,c,d)=>{const side=(p,q,r)=>(q[0]-p[0])*(r[1]-p[1])-(q[1]-p[1])*(r[0]-p[0]);const ab1=side(a,b,c),ab2=side(a,b,d),cd1=side(c,d,a),cd2=side(c,d,b);return ((ab1>=0&&ab2<=0)||(ab1<=0&&ab2>=0))&&((cd1>=0&&cd2<=0)||(cd1<=0&&cd2>=0))};
+const crossesLine=(box,[a,b])=>{const safe={left:box.left-15,right:box.right+15,top:box.top-15,bottom:box.bottom+15};if(pointInBox(a,safe)||pointInBox(b,safe))return true;const corners=[[safe.left,safe.top],[safe.right,safe.top],[safe.right,safe.bottom],[safe.left,safe.bottom]];return corners.some((corner,index)=>crosses(a,b,corner,corners[(index+1)%corners.length]))};
 const labelPositions=labels=>{
  const occupied=[];
  return labels.map(label=>{
@@ -18,9 +22,15 @@ const labelPositions=labels=>{
    {x:px-24,y:py-17,anchor:'end',box:{left:px-24-width,right:px-24,top:py-40,bottom:py-13}},
    {x:px-24,y:py+35,anchor:'end',box:{left:px-24-width,right:px-24,top:py+12,bottom:py+39}},
    {x:px,y:py-29,anchor:'middle',box:{left:px-width/2,right:px+width/2,top:py-52,bottom:py-25}},
-   {x:px,y:py+47,anchor:'middle',box:{left:px-width/2,right:px+width/2,top:py+24,bottom:py+51}}
+   {x:px,y:py+47,anchor:'middle',box:{left:px-width/2,right:px+width/2,top:py+24,bottom:py+51}},
+   {x:px+48,y:py-45,anchor:'start',box:{left:px+48,right:px+48+width,top:py-68,bottom:py-41}},
+   {x:px+48,y:py+63,anchor:'start',box:{left:px+48,right:px+48+width,top:py+40,bottom:py+67}},
+   {x:px-48,y:py-45,anchor:'end',box:{left:px-48-width,right:px-48,top:py-68,bottom:py-41}},
+   {x:px-48,y:py+63,anchor:'end',box:{left:px-48-width,right:px-48,top:py+40,bottom:py+67}},
+   {x:px,y:py-64,anchor:'middle',box:{left:px-width/2,right:px+width/2,top:py-87,bottom:py-60}},
+   {x:px,y:py+82,anchor:'middle',box:{left:px-width/2,right:px+width/2,top:py+59,bottom:py+86}}
   ];
-  const position=options.find(option=>option.box.left>=0&&option.box.right<=W&&option.box.top>=0&&option.box.bottom<=H&&!occupied.some(box=>overlaps(option.box,box)))||options[0];
+  const position=options.find(option=>option.box.left>=0&&option.box.right<=W&&option.box.top>=0&&option.box.bottom<=H&&!occupied.some(box=>overlaps(option.box,box))&&!networkSegments.some(segment=>crossesLine(option.box,segment)))||options[0];
   occupied.push(position.box);
   return {...label,...position};
  });

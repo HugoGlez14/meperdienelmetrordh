@@ -28,9 +28,9 @@ function Badge({line}){return <span className="badge" style={{background:line.co
 function PageLoader({routing=false}){return <div className="page-loader" role="status" aria-live="polite">
 <div className="loader-mark"><TrainFront size={35}/></div>
 <p className="loader-brand">meperdi<span>enelmetro</span><b>.</b></p>
-<div className="loader-track" aria-hidden="true"><i/><i/><i/></div>
-<p className="loader-copy">{routing?'Calculando tu mejor ruta':'Conectando las líneas de la ciudad'}</p>
-<span className="sr-only">{routing?'Calculando ruta':'Cargando meperdienelmetro'}</span>
+<div className="loader-route" aria-hidden="true"><i/><span><TrainFront size={18}/></span><i/></div>
+<p className="loader-copy">{routing?'Preparando tu recorrido':'Conectando las líneas de la ciudad'}</p>
+<span className="sr-only">{routing?'Preparando tu recorrido':'Cargando meperdienelmetro'}</span>
 </div>}
 function Picker({label,value,onChange,id,icon,mobile}){const [open,setOpen]=useState(false);
 return <div className="picker">

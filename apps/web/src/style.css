@@ -431,12 +431,14 @@ footer{max-width:1264px;margin:auto;border-top:1px solid #e0e5da;padding:20px 0 
 
 .error{color:#a23416;font-size:14px;line-height:1.5}
 
-.page-loader{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#f8f9f5;color:#24392f}
-.loader-mark{display:grid;place-items:center;width:72px;height:72px;border-radius:22px;background:#ef5b24;color:#fff;box-shadow:0 16px 32px #cf4b1e33;animation:loader-arrive .55s cubic-bezier(.2,.8,.2,1) both}
-.loader-brand{margin:17px 0 18px;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-1px}.loader-brand span{font-weight:400}.loader-brand b{color:#ef5b24}
-.loader-track{position:relative;display:flex;align-items:center;justify-content:space-between;width:142px;height:4px;border-radius:99px;background:#dce4d9;overflow:hidden}.loader-track:before{content:'';position:absolute;inset:0;width:46%;border-radius:inherit;background:#ef5b24;animation:loader-train 1s ease-in-out infinite}.loader-track i{position:relative;z-index:1;width:7px;height:7px;border-radius:50%;background:#f8f9f5}.loader-copy{margin:15px 0 0;color:#66766b;font-size:12px;letter-spacing:.7px}
+.page-loader{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at center,#fff 0,#f8f9f5 56%);color:#24392f}
+.loader-mark{display:grid;place-items:center;width:68px;height:68px;border-radius:50%;background:#ef5b24;color:#fff;box-shadow:0 0 0 9px #ef5b2414,0 16px 32px #cf4b1e33;animation:loader-arrive .55s cubic-bezier(.2,.8,.2,1) both,loader-pulse 1.8s ease-in-out infinite .55s}
+.loader-brand{margin:18px 0 22px;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-1px}.loader-brand span{font-weight:400}.loader-brand b{color:#ef5b24}
+.loader-route{position:relative;display:flex;align-items:center;justify-content:space-between;width:184px;height:30px}.loader-route:before{content:'';position:absolute;left:8px;right:8px;height:3px;border-radius:99px;background:#dce4d9}.loader-route:after{content:'';position:absolute;left:8px;width:54px;height:3px;border-radius:99px;background:#ef5b24;animation:loader-train 1.35s cubic-bezier(.55,0,.45,1) infinite}.loader-route i{position:relative;z-index:2;width:11px;height:11px;border:3px solid #b4c1b0;border-radius:50%;background:#f8f9f5}.loader-route span{position:relative;z-index:3;display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#24392f;color:white;box-shadow:0 5px 12px #24392f2b;animation:loader-car 1.35s cubic-bezier(.55,0,.45,1) infinite}.loader-copy{margin:17px 0 0;color:#66766b;font-size:12px;letter-spacing:.7px}
 @keyframes loader-arrive{from{opacity:0;transform:translateY(18px) scale(.88)}to{opacity:1;transform:translateY(0) scale(1)}}
-@keyframes loader-train{from{transform:translateX(-110%)}to{transform:translateX(330%)}}
+@keyframes loader-pulse{50%{box-shadow:0 0 0 15px #ef5b2408,0 16px 32px #cf4b1e33}}
+@keyframes loader-train{from{transform:translateX(0)}to{transform:translateX(122px)}}
+@keyframes loader-car{from{transform:translateX(-68px)}to{transform:translateX(68px)}}
 @keyframes loader-out{to{opacity:0;visibility:hidden;pointer-events:none}}
 
 
@@ -981,8 +983,7 @@ html[data-system='metrobus'][data-theme='dark'] body{background:#1c1216}html[dat
 @media(max-width:760px){.mb-line-card ol{columns:1}.mb-map-tools{padding:9px}.mb-map-viewport{touch-action:pan-y;overscroll-behavior-y:auto}.mb-map-full .mb-map-viewport{touch-action:pan-x pan-y}.metrobus-guide>div{grid-template-columns:1fr}}
 .mb-route-map{display:block;min-width:100%;height:auto}
 .metrobus-stops{display:grid;gap:10px;overflow:visible;padding:14px 0 4px}.metrobus-stops span{min-height:18px;padding-left:18px}.metrobus-stops span:after{content:'';position:absolute;left:2px;top:11px;width:2px;height:18px;background:#d7c4ca}.metrobus-stops span:last-child:after{display:none}.metrobus-stops span.terminal{color:#542f3a;font-weight:800}
-body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:#f8f9f5e8;backdrop-filter:blur(3px)}body:has(.search-button:disabled)::after{content:'Calculando tu mejor ruta';position:fixed;z-index:91;left:50%;top:50%;transform:translate(-50%,-50%);padding:17px 23px;border-radius:12px;background:#24392f;color:white;font-weight:700;box-shadow:0 16px 40px #24392f30}
 
 @keyframes section-arrival{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
-@media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active{animation:none}}
+@media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active,.loader-mark,.loader-route:after,.loader-route span{animation:none}}
