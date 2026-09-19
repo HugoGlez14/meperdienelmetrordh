@@ -991,3 +991,12 @@ html[data-system='metrobus'][data-theme='dark'] body{background:#1c1216}html[dat
 @keyframes section-arrival{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 
 @media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active,.loader-mark,.loader-route:after,.loader-route span,body:has(.search-button:disabled)::after{animation:none}}
+
+html{scroll-behavior:smooth;scroll-padding-top:28px}
+.sub-nav a{position:relative;padding:4px 1px 9px;transition:color .22s ease,transform .22s ease}
+.sub-nav a::after{content:'';position:absolute;left:0;right:0;bottom:0;height:2px;border-radius:2px;background:currentColor;transform:scaleX(0);transform-origin:center;transition:transform .28s cubic-bezier(.2,.8,.2,1)}
+.sub-nav a:hover,.sub-nav a:focus-visible{color:#ef5b24;transform:translateY(-2px)}
+.sub-nav a:hover::after,.sub-nav a:focus-visible::after,.sub-nav a:active::after{transform:scaleX(1)}
+html[data-system='metrobus'] .sub-nav a:hover,html[data-system='metrobus'] .sub-nav a:focus-visible{color:#be1830}
+
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.sub-nav a,.sub-nav a::after{transition:none}}
