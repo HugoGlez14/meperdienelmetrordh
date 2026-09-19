@@ -1,0 +1,22 @@
+{
+  "expo": {
+    "name": "meperdienelmetro",
+    "slug": "meperdienelmetro-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "meperdienelmetro",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.meperdienelmetro.mobile"
+    },
+    "android": {
+      "package": "com.meperdienelmetro.mobile"
+    },
+    "plugins": ["expo-router"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
