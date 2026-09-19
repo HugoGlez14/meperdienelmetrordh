@@ -716,7 +716,11 @@ footer{flex-direction:column;gap:10px;font-size:11px}
 .map-viewport{cursor:grab;touch-action:none}
 
 .main-nav{display:flex;gap:20px;margin-left:auto;margin-right:25px}
-.main-nav a{font-size:13px;color:#627167}
+.main-nav a{position:relative;font-size:13px;color:#627167;transition:color .22s ease,transform .22s ease}
+.main-nav a::after{content:'';position:absolute;left:0;right:0;bottom:-7px;height:2px;border-radius:2px;background:currentColor;transform:scaleX(0);transform-origin:center;transition:transform .22s ease}
+.main-nav a:hover,.main-nav a:focus-visible{color:#ef5b24;transform:translateY(-2px)}
+.main-nav a:hover::after,.main-nav a:focus-visible::after,.main-nav a.active::after{transform:scaleX(1)}
+.main-nav a.active{animation:section-arrival .45s ease both}
 .main-nav a:hover{text-decoration:underline;text-underline-offset:4px}
 .header-tools{display:flex;align-items:center;gap:12px}
 .city-clock{font-family:'Space Grotesk',sans-serif;font-size:12px;letter-spacing:.5px;color:#607064}
@@ -978,3 +982,7 @@ html[data-system='metrobus'][data-theme='dark'] body{background:#1c1216}html[dat
 .mb-route-map{display:block;min-width:100%;height:auto}
 .metrobus-stops{display:grid;gap:10px;overflow:visible;padding:14px 0 4px}.metrobus-stops span{min-height:18px;padding-left:18px}.metrobus-stops span:after{content:'';position:absolute;left:2px;top:11px;width:2px;height:18px;background:#d7c4ca}.metrobus-stops span:last-child:after{display:none}.metrobus-stops span.terminal{color:#542f3a;font-weight:800}
 body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:#f8f9f5e8;backdrop-filter:blur(3px)}body:has(.search-button:disabled)::after{content:'Calculando tu mejor ruta';position:fixed;z-index:91;left:50%;top:50%;transform:translate(-50%,-50%);padding:17px 23px;border-radius:12px;background:#24392f;color:white;font-weight:700;box-shadow:0 16px 40px #24392f30}
+
+@keyframes section-arrival{from{opacity:.45;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+@media(prefers-reduced-motion:reduce){.main-nav a,.main-nav a::after{transition:none}.main-nav a.active{animation:none}}
