@@ -32,14 +32,15 @@ function PageLoader({routing=false}){return <div className="page-loader" role="s
 <p className="loader-copy">{routing?'Preparando tu recorrido':'Conectando las líneas de la ciudad'}</p>
 <span className="sr-only">{routing?'Preparando tu recorrido':'Cargando meperdienelmetro'}</span>
 </div>}
-function Picker({label,value,onChange,id,icon,mobile}){const [open,setOpen]=useState(false);
+function Picker({label,value,onChange,id,icon,mobile}){const [open,setOpen]=useState(false),[query,setQuery]=useState('');
+const openPicker=()=>{setQuery('');setOpen(true)};
 return <div className="picker">
 <label>{label}</label>
-<div className="input-wrap">{icon}<input aria-label={label} value={value} readOnly={mobile} inputMode={mobile?'none':undefined} onClick={()=>setOpen(true)} onFocus={()=>setOpen(true)} onBlur={()=>!mobile&&setTimeout(()=>setOpen(false),150)} onChange={e=>{onChange(e.target.value);
+<div className="input-wrap">{icon}<input aria-label={label} value={open?query:value} readOnly={mobile} inputMode={mobile?'none':undefined} onClick={openPicker} onFocus={openPicker} onBlur={()=>!mobile&&setTimeout(()=>setOpen(false),150)} onChange={e=>{setQuery(e.target.value);
 setOpen(true)}}/>
 <ChevronDown size={17}/>
-</div>{open&&<div className={'options'+(mobile?' options-mobile':'')} id={id}>{mobile&&<div className="options-mobile-heading"><strong>{label}</strong><button type="button" onClick={()=>setOpen(false)}>Cerrar</button></div>}{stations.filter(s=>normalize(s).includes(normalize(value))).map(s=>
-<button type="button" key={s} onMouseDown={e=>e.preventDefault()} onClick={()=>{onChange(s);
+</div>{open&&<div className={'options'+(mobile?' options-mobile':'')} id={id}>{mobile&&<div className="options-mobile-heading"><strong>{label}</strong><button type="button" onClick={()=>setOpen(false)}>Cerrar</button></div>}{stations.filter(s=>normalize(s).includes(normalize(query))).map(s=>
+<button type="button" key={s} onMouseDown={e=>e.preventDefault()} onClick={()=>{onChange(s);setQuery('');
 setOpen(false)}}>
 <span>{s}</span>
 <span>{stationLines(s).map(l=>
