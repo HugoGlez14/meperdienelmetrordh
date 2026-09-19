@@ -441,10 +441,9 @@ footer{max-width:1264px;margin:auto;border-top:1px solid #e0e5da;padding:20px 0 
 @keyframes loader-car{from{transform:translateX(-68px)}to{transform:translateX(68px)}}
 @keyframes loader-out{to{opacity:0;visibility:hidden;pointer-events:none}}
 
-body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:#f8f9f5cc;backdrop-filter:blur(4px)}
-body:has(.search-button:disabled)::after{content:'Preparando tu recorrido';position:fixed;z-index:91;left:50%;top:50%;min-width:240px;padding:18px 24px 18px 58px;border-radius:15px;background:linear-gradient(90deg,#24392f,#31513f,#24392f);background-size:200% 100%;color:white;font-weight:700;box-shadow:0 18px 45px #24392f38;transform:translate(-50%,-50%);animation:route-loader-shine 1.25s ease-in-out infinite}
-body:has(.search-button:disabled)::after{background-image:radial-gradient(circle at 31px 50%,#fff 0 5px,transparent 6px),linear-gradient(90deg,#24392f,#31513f,#24392f)}
-@keyframes route-loader-shine{50%{background-position:100% 0;box-shadow:0 22px 52px #24392f4d}}
+body:has(.search-button:disabled)::before{content:'';position:fixed;inset:0;z-index:90;background:linear-gradient(#f8f9f5d9,#f8f9f5d9),linear-gradient(90deg,transparent 0 43%,#cbd8c7 43% 57%,transparent 57%);backdrop-filter:blur(4px)}
+body:has(.search-button:disabled)::after{content:'🚌';position:fixed;z-index:91;left:50%;top:50%;display:grid;place-items:center;width:62px;height:62px;border-radius:18px;background:#be1830;color:white;font-size:31px;line-height:1;box-shadow:0 16px 35px #74203240;transform:translate(-50%,-50%);animation:route-bus-moving 1.35s cubic-bezier(.55,0,.45,1) infinite}
+@keyframes route-bus-moving{0%{transform:translate(calc(-50% - 118px),-50%)}45%{transform:translate(calc(-50% + 118px),-50%)}50%{transform:translate(calc(-50% + 118px),-50%) scaleX(-1)}95%,100%{transform:translate(calc(-50% - 118px),-50%) scaleX(-1)}}
 
 
 
