@@ -2,7 +2,7 @@ import React,{useEffect,useMemo,useState} from 'react';
 
 import {createRoot} from 'react-dom/client';
 
-import {ArrowDownUp,ArrowRight,ArrowUpRight,Clock3,Footprints,Info,LocateFixed,MapPin,Navigation,TrainFront,ChevronDown,Route} from 'lucide-react';
+import {ArrowDownUp,ArrowRight,ArrowUpRight,BusFront,Clock3,Footprints,Info,LocateFixed,MapPin,Navigation,TrainFront,ChevronDown,Route} from 'lucide-react';
 
 import {
   metroLines as lines,
@@ -25,10 +25,10 @@ import MetrobusPlanner from './MetrobusPlanner';
 const copy={es:{tag:'MENOS VUELTAS. MÁS CIUDAD.',head:'Piérdete en la ciudad.',accent:'No en el Metro.',from:'Estoy en',to:'Quiero ir a',fast:'Menor tiempo',few:'Menos cambios',find:'Encontrar mi ruta',empty:'Tu próxima ruta empieza aquí',emptyText:'Selecciona dónde estás y a dónde quieres ir para ver tu recorrido.',trip:'TU PRÓXIMO VIAJE',recommended:'Recomendada',alternative:'Alternativa',time:'tiempo estimado',stops:'estaciones por recorrer',transfer:'transbordo',transfers:'transbordos',steps:'Tu ruta, paso a paso',error:'Selecciona dos estaciones de la lista para encontrar tu ruta.'},en:{tag:'FEWER TURNS. MORE CITY.',head:'Get lost in the city.',accent:'Not in the Metro.',from:'I am at',to:'I want to go to',fast:'Fastest route',few:'Fewer transfers',find:'Find my route',empty:'Your next route starts here',emptyText:'Choose where you are and where you want to go to see your route.',trip:'YOUR NEXT TRIP',recommended:'Recommended',alternative:'Alternative',time:'estimated time',stops:'stops to travel',transfer:'transfer',transfers:'transfers',steps:'Your route, step by step',error:'Choose two stations from the list to find your route.'}};
 
 function Badge({line}){return <span className="badge" style={{background:line.color}}>{line.id}</span>}
-function PageLoader({routing=false}){return <div className="page-loader" role="status" aria-live="polite">
-<div className="loader-mark"><TrainFront size={35}/></div>
-<p className="loader-brand">meperdi<span>enelmetro</span><b>.</b></p>
-<div className="loader-route" aria-hidden="true"><i/><span><TrainFront size={18}/></span><i/></div>
+function PageLoader({routing=false,metrobus=false}){const Vehicle=metrobus?BusFront:TrainFront;const brand=metrobus?'me perdi en el metrobus':'me perdi en el metro';return <div className="page-loader" role="status" aria-live="polite">
+<div className="loader-mark"><Vehicle size={35}/></div>
+<p className="loader-brand">{brand}<b>.</b></p>
+<div className={'loader-route'+(metrobus?' loader-route-bus':'')} aria-hidden="true"><i/><span><Vehicle size={20}/></span><i/></div>
 <p className="loader-copy">{routing?'Preparando tu recorrido':'Conectando las líneas de la ciudad'}</p>
 <span className="sr-only">{routing?'Preparando tu recorrido':'Cargando meperdienelmetro'}</span>
 </div>}
@@ -61,11 +61,11 @@ return}if(from===to){setError(language==='en'?'Origin and destination must be di
 return}setError('');
 setLoading(true);
 setSelected(0);
-setTimeout(()=>{setTrip({from,to,mode});setLoading(false)},900)}return <>{(pageLoading||loading)&&<PageLoader routing={loading&&!pageLoading}/>}
+setTimeout(()=>{setTrip({from,to,mode});setLoading(false)},900)}return <>{(pageLoading||loading)&&<PageLoader routing={loading&&!pageLoading} metrobus={isMetrobus}/>}
 <header>
 <a className="brand" href="./">
 <img className="brand-icon" src="/logo.svg" alt=""/>
-<span>meperdi<span className="brand-light">{isMetrobus?'enelmetrobus':'enelmetro'}</span>
+<span>{isMetrobus?'me perdi':'meperdi'}<span className="brand-light">{isMetrobus?' en el metrobus':'enelmetro'}</span>
 <span className="brand-dot">.</span>
 </span>
 </a>

@@ -87,6 +87,15 @@ describe('controlador compartido', () => {
 });
 
 describe('modelo de rutas de Metrobús', () => {
+  it('incluye el recorrido actual de Línea 4 entre Hidalgo y Alameda Oriente', () => {
+    const route = findMetrobusRoute('Hidalgo', 'Alameda Oriente');
+    assert.notEqual(route, null);
+    assert.equal(route!.transfers, 0);
+    assert.equal(route!.stops, 12);
+    assert.equal(route!.segments[0].line.id, '4');
+    assert.equal(route!.segments[0].direction, 'Alameda Oriente');
+  });
+
   it('mantiene conectada toda la red', () => {
     for (const station of metrobusStations) {
       assert.notEqual(findMetrobusRoute('Reforma', station), null);
