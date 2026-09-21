@@ -11,6 +11,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { TransitLine } from '@meperdienelmetro/core';
 import { theme } from '../theme';
+import { useApp } from '../app-state';
 
 type Props = {
   label: string;
@@ -23,6 +24,7 @@ type Props = {
 const normalize=(value:string)=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 
 export function StationPicker({label,value,lines,onChange,placeholder}:Props){
+  const {theme:appTheme,t}=useApp();
   const [open,setOpen]=useState(false);
   const [query,setQuery]=useState('');
   const [selectedLineId,setSelectedLineId]=useState<string|null>(null);
@@ -53,26 +55,26 @@ export function StationPicker({label,value,lines,onChange,placeholder}:Props){
   }
 
   return <>
-    <Text style={styles.label}>{label}</Text>
-    <Pressable style={styles.field} onPress={openPicker} accessibilityRole="button">
-      <Text style={value?styles.value:styles.placeholder}>{value||placeholder}</Text>
+    <Text style={[styles.label,{color:appTheme.colors.muted}]}>{label}</Text>
+    <Pressable style={[styles.field,{backgroundColor:appTheme.colors.surface,borderColor:appTheme.colors.border}]} onPress={openPicker} accessibilityRole="button">
+      <Text style={[value?styles.value:styles.placeholder,{color:value?appTheme.colors.text:appTheme.colors.muted}]}>{value||placeholder}</Text>
       <Text style={styles.chevron}>⌄</Text>
     </Pressable>
 
     <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleRequestClose}>
-      <SafeAreaView style={styles.modal}>
+      <SafeAreaView style={[styles.modal,{backgroundColor:appTheme.colors.background}]}>
         <View style={styles.modalHeader}>
           <View style={styles.headerCopy}>
             {selectedLine
               ? <Pressable onPress={showLines} hitSlop={10} accessibilityRole="button">
-                  <Text style={styles.back}>← Todas las líneas</Text>
+                  <Text style={[styles.back,{color:appTheme.colors.accent}]}>← {t.allLines}</Text>
                 </Pressable>
-              : <Text style={styles.modalEyebrow}>LÍNEAS DISPONIBLES</Text>}
-            <Text style={styles.modalTitle}>{selectedLine?`Línea ${selectedLine.id}`:label}</Text>
-            <Text style={styles.modalSubtitle}>{selectedLine?'Selecciona una estación':'Selecciona una línea para ver sus estaciones'}</Text>
+              : <Text style={[styles.modalEyebrow,{color:appTheme.colors.accent}]}>{t.catalog}</Text>}
+            <Text style={[styles.modalTitle,{color:appTheme.colors.text}]}>{selectedLine?`${t.line} ${selectedLine.id}`:label}</Text>
+            <Text style={[styles.modalSubtitle,{color:appTheme.colors.muted}]}>{selectedLine?t.selectLine:t.allLines}</Text>
           </View>
           <Pressable onPress={()=>setOpen(false)} hitSlop={12} accessibilityRole="button">
-            <Text style={styles.close}>Cerrar</Text>
+            <Text style={[styles.close,{color:appTheme.colors.accent}]}>{t.close}</Text>
           </Pressable>
         </View>
 
@@ -81,9 +83,9 @@ export function StationPicker({label,value,lines,onChange,placeholder}:Props){
             autoFocus
             value={query}
             onChangeText={setQuery}
-            placeholder="Buscar en esta línea"
-            placeholderTextColor={theme.colors.muted}
-            style={styles.search}
+            placeholder={t.selectLine}
+            placeholderTextColor={appTheme.colors.muted}
+            style={[styles.search,{backgroundColor:appTheme.colors.surface,borderColor:appTheme.colors.border,color:appTheme.colors.text}]}
           />
           <FlatList
             data={filteredStations}
@@ -92,10 +94,10 @@ export function StationPicker({label,value,lines,onChange,placeholder}:Props){
             contentContainerStyle={styles.list}
             renderItem={({item})=><Pressable style={styles.option} onPress={()=>{onChange(item);setOpen(false)}} accessibilityRole="button">
               <View style={[styles.stationMarker,{backgroundColor:selectedLine.color}]}/>
-              <Text style={styles.optionText}>{item}</Text>
+              <Text style={[styles.optionText,{color:appTheme.colors.text}]}>{item}</Text>
               <Text style={styles.arrow}>→</Text>
             </Pressable>}
-            ListEmptyComponent={<Text style={styles.empty}>No encontramos estaciones con ese nombre en esta línea.</Text>}
+            ListEmptyComponent={<Text style={[styles.empty,{color:appTheme.colors.muted}]}>{t.noRoute}</Text>}
           />
         </>:<FlatList
           data={lines}
@@ -104,13 +106,13 @@ export function StationPicker({label,value,lines,onChange,placeholder}:Props){
           renderItem={({item})=><Pressable style={styles.lineOption} onPress={()=>setSelectedLineId(item.id)} accessibilityRole="button">
             <View style={[styles.lineMarker,{backgroundColor:item.color}]}/>
             <View style={styles.lineCopy}>
-              <Text style={styles.lineTitle}>Línea {item.id}</Text>
-              <Text style={styles.lineRoute} numberOfLines={1}>{item.stations[0]} — {item.stations.at(-1)}</Text>
-              <Text style={styles.lineCount}>{item.stations.length} estaciones</Text>
+              <Text style={[styles.lineTitle,{color:appTheme.colors.text}]}>{t.line} {item.id}</Text>
+              <Text style={[styles.lineRoute,{color:appTheme.colors.muted}]} numberOfLines={1}>{item.stations[0]} — {item.stations.at(-1)}</Text>
+              <Text style={[styles.lineCount,{color:appTheme.colors.muted}]}>{item.stations.length} {t.stops}</Text>
             </View>
             <Text style={styles.arrow}>→</Text>
           </Pressable>}
-          ListEmptyComponent={<Text style={styles.empty}>No hay líneas disponibles.</Text>}
+          ListEmptyComponent={<Text style={[styles.empty,{color:appTheme.colors.muted}]}>{t.noRoute}</Text>}
         />}
       </SafeAreaView>
     </Modal>
