@@ -20,7 +20,7 @@ import MetroUpdates from './MetroUpdates';
 import LinesCatalog from './LinesCatalog';
 import ServiceInfo from './ServiceInfo';
 import SiteControls,{CityClock} from './SiteControls';
-import MetrobusPlanner from './MetrobusPlanner';
+import MetrobusPlanner from './MetrobusLive';
 
 const copy={es:{tag:'MENOS VUELTAS. MÁS CIUDAD.',head:'Piérdete en la ciudad.',accent:'No en el Metro.',from:'Estoy en',to:'Quiero ir a',fast:'Menor tiempo',few:'Menos cambios',find:'Encontrar mi ruta',empty:'Tu próxima ruta empieza aquí',emptyText:'Selecciona dónde estás y a dónde quieres ir para ver tu recorrido.',trip:'TU PRÓXIMO VIAJE',recommended:'Recomendada',alternative:'Alternativa',time:'tiempo estimado',stops:'estaciones por recorrer',transfer:'transbordo',transfers:'transbordos',steps:'Tu ruta, paso a paso',error:'Selecciona dos estaciones de la lista para encontrar tu ruta.'},en:{tag:'FEWER TURNS. MORE CITY.',head:'Get lost in the city.',accent:'Not in the Metro.',from:'I am at',to:'I want to go to',fast:'Fastest route',few:'Fewer transfers',find:'Find my route',empty:'Your next route starts here',emptyText:'Choose where you are and where you want to go to see your route.',trip:'YOUR NEXT TRIP',recommended:'Recommended',alternative:'Alternative',time:'estimated time',stops:'stops to travel',transfer:'transfer',transfers:'transfers',steps:'Your route, step by step',error:'Choose two stations from the list to find your route.'}};
 
@@ -46,14 +46,13 @@ setOpen(false)}}>
 <span>{stationLines(s).map(l=>
 <Badge key={l.id} line={l}/>)}</span>
 </button>)}</div>}</div>}
-function App(){const [from,setFrom]=useState(''),[to,setTo]=useState(''),[mode,setMode]=useState('fast'),[trip,setTrip]=useState(null),[error,setError]=useState(''),[selected,setSelected]=useState(0),[language,setLanguage]=useState('es'),[theme,setTheme]=useState('light'),[loading,setLoading]=useState(false),[pageLoading,setPageLoading]=useState(true),[mobile,setMobile]=useState(()=>window.innerWidth<=760);
+function App(){const [from,setFrom]=useState(''),[to,setTo]=useState(''),[mode,setMode]=useState('fast'),[trip,setTrip]=useState(null),[error,setError]=useState(''),[selected,setSelected]=useState(0),[language,setLanguage]=useState('es'),[theme,setTheme]=useState('light'),[loading,setLoading]=useState(false),[mobile,setMobile]=useState(()=>window.innerWidth<=760);
 const isMetrobus=window.location.pathname.replace(/\/$/,'')==='/metrobus';
 const t=copy[language],routes=useMemo(()=>trip?planRoute({transport:'metro',from:trip.from,to:trip.to,mode:trip.mode}).routes:[],[trip]),route=routes[selected]||routes[0];
 useEffect(()=>{document.documentElement.lang=language;
 document.documentElement.dataset.system=isMetrobus?'metrobus':'metro';
 document.documentElement.dataset.theme=theme},[language,theme]);
-useEffect(()=>{const timer=setTimeout(()=>setPageLoading(false),1800);
-return()=>clearTimeout(timer)},[]);
+
 useEffect(()=>{const update=()=>setMobile(window.innerWidth<=760);window.addEventListener('resize',update);return()=>window.removeEventListener('resize',update)},[]);
 function submit(e){e.preventDefault();
 if(!stations.includes(from)||!stations.includes(to)){setError(t.error);
@@ -61,7 +60,7 @@ return}if(from===to){setError(language==='en'?'Origin and destination must be di
 return}setError('');
 setLoading(true);
 setSelected(0);
-setTimeout(()=>{setTrip({from,to,mode});setLoading(false)},900)}return <>{(pageLoading||loading)&&<PageLoader routing={loading&&!pageLoading} metrobus={isMetrobus}/>}
+setTimeout(()=>{setTrip({from,to,mode});setLoading(false)},900)}return <>{loading&&<PageLoader routing={loading} metrobus={isMetrobus}/>}
 <header>
 <a className="brand" href="./">
 <img className="brand-icon" src="/logo.svg" alt=""/>

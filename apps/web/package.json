@@ -7,7 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test --experimental-test-isolation=none src/map-layout.test.js"
+    "test": "node --test --experimental-test-isolation=none src/map-layout.test.js scripts/metrobus-loading.test.mjs scripts/metrobus-route-filter.test.mjs"
   },
   "dependencies": {
     "@meperdienelmetro/core": "*",
@@ -16,6 +16,7 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "jsdom": "^27.0.1",
     "vite": "^6.3.0"
   }
 }

@@ -10,3 +10,6 @@ coverage/
 !.env.example
 .DS_Store
 settings.json
+apps/api/data/
+apps/api/.venv/
+__pycache__/
