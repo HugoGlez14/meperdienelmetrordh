@@ -177,8 +177,9 @@ test('Metrobús falls back to the bundled planner when the local API is unavaila
     const document = dom.window.document;
     assert.match(document.body.textContent, /Planificador local activo/);
     assert.doesNotMatch(document.body.textContent, /El servicio local de Metrobús no está disponible/);
-    assert.ok(document.querySelector('input[aria-label="Estoy en"]'));
-    assert.ok(document.querySelector('input[aria-label="Quiero ir a"]'));
+    const offlineSelectors = document.querySelectorAll('input[role="combobox"]');
+    assert.equal(offlineSelectors.length, 2, 'the offline planner uses the shared searchable selectors');
+    assert.ok(document.querySelector('label')?.textContent.includes('Estoy en'));
     assert.ok(document.querySelector('.mb-map svg'), 'the bundled schematic map must be visible');
   } finally {
     if (root) await act(async () => root.unmount());

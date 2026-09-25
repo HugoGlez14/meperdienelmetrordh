@@ -20,23 +20,19 @@ function ride(route){return {kind:'ride',routeId:route.route_id,route,points:net
 test('a planned journey shows only vehicles and traces for its route IDs',async()=>{
   const vite=await createServer({root:fileURLToPath(new URL('../',import.meta.url)),configFile:false,server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true}});
   try{
-    const {GeographicMap,buildLiveJourney}=await vite.ssrLoadModule('/src/MetrobusLive.jsx');
+    const {GeographicMap,buildLiveJourney,routeTerminals}=await vite.ssrLoadModule('/src/MetrobusLive.jsx');
     const render=journey=>renderToStaticMarkup(React.createElement(GeographicMap,{network,live,line:'',variant:'',journey}));
     const browsing=render(null);
-    assert.equal((browsing.match(/role="button"/g)||[]).length,3,'general network can show unidentified vehicles');
+    assert.match(browsing,/data-vehicle-ids="unit-a,unit-b,unit-unknown"/,'general network can show unidentified vehicles');
     const a=render({found:true,segments:[ride(routeA)]});
-    assert.match(a,/Unidad A/);
-    assert.doesNotMatch(a,/Unidad B|Unidad \?/);
-    assert.equal((a.match(/role="button"/g)||[]).length,1);
-    assert.equal((a.match(/<polyline[^>]*stroke="#BE1830"/g)||[]).length,2,'only one full route trace and its selected section');
-    assert.doesNotMatch(a,/<polyline[^>]*stroke="#7848A5"/,'unrelated route traces stay hidden');
+    assert.match(a,/data-vehicle-ids="unit-a"/);
+    assert.match(a,/data-path-lines="1"/,'only the selected route trace remains');
     const both=render({found:true,segments:[ride(routeA),ride(routeB)]});
-    assert.equal((both.match(/role="button"/g)||[]).length,2,'transfers include vehicles from both route IDs');
-    assert.doesNotMatch(both,/Unidad \?/);
+    assert.match(both,/data-vehicle-ids="unit-a,unit-b"/,'transfers include vehicles from both route IDs');
+    assert.match(both,/data-path-lines="1,2"/);
     const byLine=render({found:true,segments:[{...ride(routeA),routeId:'line-not-a-route-id',lineId:'1'}]});
-    assert.match(byLine,/Unidad A/,'a local plan is linked to every GTFS variant of its line');
-    assert.doesNotMatch(byLine,/Unidad B|Unidad \?/);
-    assert.match(byLine,/r="9"/,'vehicle markers stay compact');
+    assert.match(byLine,/data-vehicle-ids="unit-a"/,'a local plan is linked to every GTFS variant of its line');
+    assert.deepEqual(routeTerminals({route_long_name:'L01a07-1 indios verdes - el caminero'}),{origin:'indios verdes',destination:'el caminero'});
 
     const journeyNetwork={
       ...network,

@@ -1,6 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BusFront, Clock3, Download, Footprints, MapPin, Navigation, Route } from "lucide-react";
 import { metrobusStationLines, metrobusStations, planRoute } from "@meperdienelmetro/core";
+import L from "leaflet";
+import { MapContainer, Marker, Polyline, Popup, TileLayer, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
 import OfflinePlanner from "./MetrobusPlanner";
 import MetrobusSelect from "./MetrobusSelect";
 
@@ -118,7 +121,7 @@ export function buildLiveJourney(routePlan, network, startedAt = Math.floor(Date
   };
 }
 
-export function GeographicMap({ network, live, line, variant, journey }) {
+function LegacyGeographicMap({ network, live, line, variant, journey }) {
   const [zoom, setZoom] = useState(1),
     [selected, setSelected] = useState(null);
   const local = network.source === "local";
@@ -360,6 +363,147 @@ export function GeographicMap({ network, live, line, variant, journey }) {
         {local ? "Mapa esquemático incluido en la aplicación." : "Posiciones recibidas en los últimos 2 minutos. Toca una unidad para ver su información."}
         {journey?.found && !local && " El tiempo de llegada del viaje procede del horario, no de la ubicación de la unidad."}
       </p>
+    </section>
+  );
+}
+
+function FitLeafletMap({ points }) {
+  const map = useMap();
+  useEffect(() => {
+    map.invalidateSize();
+    if (!points.length) return;
+    const bounds = L.latLngBounds(points);
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [34, 34], maxZoom: 15, animate: false });
+  }, [map, points]);
+  return null;
+}
+
+export function routeTerminals(route) {
+  const clean = String(route?.route_long_name || "")
+    .replace(/^\S+\s+/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const parts = clean.split(/\s+-\s+/).filter(Boolean);
+  return {
+    origin: parts[0] || "Origen no identificado",
+    destination: parts.slice(1).join(" - ") || "Destino no identificado",
+  };
+}
+
+function titleCase(value) {
+  return value.replace(/(^|\s)(\p{L})/gu, (_, space, letter) => space + letter.toLocaleUpperCase("es"));
+}
+
+function vehicleMarker(color) {
+  return L.divIcon({
+    className: "mb-leaflet-vehicle-wrap",
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    popupAnchor: [0, -13],
+    html: `<span class="mb-leaflet-vehicle" style="--vehicle-color:#${color}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 17h12M6 17V6.8C6 5.25 7.25 4 8.8 4h6.4C16.75 4 18 5.25 18 6.8V17M7 12h10M8.5 8h7M8 20v-3m8 3v-3"/><circle cx="9" cy="15" r="1"/><circle cx="15" cy="15" r="1"/></svg></span>`,
+  });
+}
+
+export function GeographicMap({ network, live, line, variant, journey }) {
+  const now = Date.now() / 1000;
+  const freshVehicles = (live?.vehicles || []).filter((vehicle) =>
+    Number.isFinite(vehicle.lat) && Number.isFinite(vehicle.lng) && vehicle.timestamp > 0 &&
+    now - vehicle.timestamp <= 120 && vehicle.timestamp <= now + 30,
+  );
+  const journeyRouteIds = new Set(journey?.found
+    ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => segment.routeId)
+    : []);
+  const journeyLineIds = new Set(journey?.found
+    ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => String(segment.lineId || segment.route?.route_short_name || ""))
+    : []);
+  const routes = network.routes.filter((route) => journey?.found
+    ? journeyRouteIds.has(route.route_id) || journeyLineIds.has(String(route.route_short_name))
+    : (!line || route.route_short_name === line) && (!variant || route.route_id === variant));
+  const routeIds = new Set(routes.map((route) => route.route_id));
+  const allRoutePaths = routes.flatMap((route) => (route.shapeIds || []).map((shapeId) => ({
+    id: `${route.route_id}:${shapeId}`,
+    route,
+    points: network.shapes[shapeId] || [],
+  }))).filter((path) => path.points.length > 1);
+  const journeyPaths = journey?.found
+    ? journey.segments.filter((segment) => segment.kind === "ride" && segment.points?.length > 1).map((segment, index) => ({
+      id: `journey:${index}`,
+      route: segment.route,
+      points: segment.points,
+    }))
+    : [];
+  const visiblePaths = journeyPaths.length ? journeyPaths : allRoutePaths;
+  const journeyPoints = journeyPaths.flatMap((path) => path.points);
+  const journeyBounds = journeyPoints.length ? journeyPoints.reduce((bounds, [lat, lng]) => ({
+    minLat: Math.min(bounds.minLat, lat), maxLat: Math.max(bounds.maxLat, lat),
+    minLng: Math.min(bounds.minLng, lng), maxLng: Math.max(bounds.maxLng, lng),
+  }), { minLat: Infinity, maxLat: -Infinity, minLng: Infinity, maxLng: -Infinity }) : null;
+  const latPadding = journeyBounds ? Math.max(0.004, (journeyBounds.maxLat - journeyBounds.minLat) * 0.12) : 0;
+  const lngPadding = journeyBounds ? Math.max(0.004, (journeyBounds.maxLng - journeyBounds.minLng) * 0.12) : 0;
+  const vehicles = freshVehicles.filter((vehicle) => {
+    if (!(routeIds.has(vehicle.routeId) || (!journey?.found && !line && !variant))) return false;
+    if (!journeyBounds) return true;
+    return vehicle.lat >= journeyBounds.minLat - latPadding && vehicle.lat <= journeyBounds.maxLat + latPadding &&
+      vehicle.lng >= journeyBounds.minLng - lngPadding && vehicle.lng <= journeyBounds.maxLng + lngPadding;
+  });
+  const boundsPoints = [...visiblePaths.flatMap((path) => path.points), ...vehicles.map((vehicle) => [vehicle.lat, vehicle.lng])];
+  const routeById = new Map(network.routes.map((route) => [route.route_id, route]));
+  const mapKey = `${line}:${variant}:${journey?.segments?.map((segment) => segment.routeId || segment.lineId).join(",") || "network"}`;
+  const download = () => {
+    const data = JSON.stringify({
+      type: "FeatureCollection",
+      features: visiblePaths.map((path) => ({
+        type: "Feature",
+        properties: { id: path.id, line: path.route.route_short_name, color: path.route.route_color },
+        geometry: { type: "LineString", coordinates: path.points.map(([lat, lng]) => [lng, lat]) },
+      })),
+    }, null, 2);
+    const url = URL.createObjectURL(new Blob([data], { type: "application/geo+json" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = journey?.found ? "mi-trayecto-metrobus.geojson" : "recorridos-metrobus.geojson";
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+  return (
+    <section className="mb-map mb-leaflet-map" aria-label="Mapa de Metrobús" data-vehicle-ids={vehicles.map((vehicle) => vehicle.id).join(",")} data-path-lines={visiblePaths.map((path) => path.route.route_short_name).join(",")}>
+      <div className="mb-map-head">
+        <div className="mb-map-heading"><span className="mb-map-heading-icon"><Navigation size={19} /></span><div><p className="eyebrow">MAPA EN VIVO</p><h3>{journey?.found ? "Tu trayecto y sus unidades" : "Red y unidades de Metrobús"}</h3></div></div>
+        <span className="mb-map-count"><BusFront size={15} /> {vehicles.length} unidades visibles</span>
+      </div>
+      <div className="mb-map-tools">
+        <div className="mb-map-lines" aria-label="Líneas visibles">
+          {[...new Map(routes.map((route) => [route.route_short_name, route])).values()].map((route) => <span className="mb-map-line" key={route.route_short_name} style={{ "--line-color": `#${route.route_color}` }}>Línea {route.route_short_name}</span>)}
+        </div>
+        <div><button type="button" onClick={download} title="Descargar recorridos visibles"><Download size={15} /> <span>Descargar</span></button></div>
+      </div>
+      <div className="mb-map-viewport mb-leaflet-viewport">
+        <MapContainer key={mapKey} center={[19.4326, -99.1332]} zoom={11} scrollWheelZoom className="mb-leaflet-canvas">
+          <TileLayer attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          <FitLeafletMap points={boundsPoints} />
+          {visiblePaths.map((path) => <Polyline key={path.id} positions={path.points} pathOptions={{ color: `#${path.route.route_color}`, weight: journey?.found ? 7 : 4, opacity: journey?.found ? 0.95 : 0.72 }} />)}
+          {vehicles.map((vehicle) => {
+            const route = routeById.get(vehicle.routeId);
+            const terminals = routeTerminals(route);
+            const age = Math.max(0, Math.round(now - vehicle.timestamp));
+            return <Marker key={vehicle.id} position={[vehicle.lat, vehicle.lng]} icon={vehicleMarker(route?.route_color || "26364A")}>
+              <Popup minWidth={280} maxWidth={340} className="mb-vehicle-popup">
+                <div className="mb-popup-head"><span style={{ background: `#${route?.route_color || "26364A"}` }}><BusFront size={17} /></span><div><small>LÍNEA {route?.route_short_name || "SIN ASIGNAR"}</small><strong>Unidad {vehicle.label || vehicle.id}</strong></div></div>
+                <div className="mb-popup-direction"><div><small>Origen</small><strong>{titleCase(terminals.origin)}</strong></div><ArrowRight size={18} /><div><small>Destino</small><strong>{titleCase(terminals.destination)}</strong></div></div>
+                <dl className="mb-popup-details">
+                  <div><dt>Última señal</dt><dd>{age < 15 ? "Hace unos segundos" : `Hace ${age} segundos`} · {clock(vehicle.timestamp)}</dd></div>
+                  <div><dt>Recorrido GTFS</dt><dd>{route?.route_long_name || "No identificado"}</dd></div>
+                  <div><dt>ID de unidad</dt><dd>{vehicle.id}</dd></div>
+                  {vehicle.tripId && <div><dt>ID de viaje</dt><dd>{vehicle.tripId}</dd></div>}
+                  <div><dt>Ubicación</dt><dd>{vehicle.lat.toFixed(5)}, {vehicle.lng.toFixed(5)}</dd></div>
+                </dl>
+                <p className="mb-popup-note">Posición reportada por el servicio GTFS en tiempo real. El destino corresponde al recorrido asignado a esta unidad.</p>
+              </Popup>
+            </Marker>;
+          })}
+        </MapContainer>
+      </div>
+      <p className="mb-map-note">Mapa de calles por OpenStreetMap · posiciones GTFS de los últimos 2 minutos. Toca un camioncito para ver origen, destino y detalles.</p>
     </section>
   );
 }
