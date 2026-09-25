@@ -20,7 +20,7 @@ function ride(route){return {kind:'ride',routeId:route.route_id,route,points:net
 test('a planned journey shows only vehicles and traces for its route IDs',async()=>{
   const vite=await createServer({root:fileURLToPath(new URL('../',import.meta.url)),configFile:false,server:{middlewareMode:true},appType:'custom',optimizeDeps:{noDiscovery:true}});
   try{
-    const {GeographicMap}=await vite.ssrLoadModule('/src/MetrobusLive.jsx');
+    const {GeographicMap,buildLiveJourney}=await vite.ssrLoadModule('/src/MetrobusLive.jsx');
     const render=journey=>renderToStaticMarkup(React.createElement(GeographicMap,{network,live,line:'',variant:'',journey}));
     const browsing=render(null);
     assert.equal((browsing.match(/role="button"/g)||[]).length,3,'general network can show unidentified vehicles');
@@ -33,5 +33,24 @@ test('a planned journey shows only vehicles and traces for its route IDs',async(
     const both=render({found:true,segments:[ride(routeA),ride(routeB)]});
     assert.equal((both.match(/role="button"/g)||[]).length,2,'transfers include vehicles from both route IDs');
     assert.doesNotMatch(both,/Unidad \?/);
+    const byLine=render({found:true,segments:[{...ride(routeA),routeId:'line-not-a-route-id',lineId:'1'}]});
+    assert.match(byLine,/Unidad A/,'a local plan is linked to every GTFS variant of its line');
+    assert.doesNotMatch(byLine,/Unidad B|Unidad \?/);
+    assert.match(byLine,/r="9"/,'vehicle markers stay compact');
+
+    const journeyNetwork={
+      ...network,
+      stops:[
+        {stop_id:'from-l1',stop_name:'Indios Verdes L1',stop_lat:'19.4',stop_lon:'-99.16'},
+        {stop_id:'to',stop_name:'El Caminero',stop_lat:'19.41',stop_lon:'-99.15'},
+      ],
+    };
+    const routePlan={minutes:2,transfers:0,segments:[{line:{id:'1',color:'#BE1830'},stations:['Indios Verdes','El Caminero'],direction:'El Caminero'}]};
+    const linked=buildLiveJourney(routePlan,journeyNetwork,1_700_000_000);
+    assert.equal(linked.found,true);
+    assert.equal(linked.segments[0].lineId,'1');
+    assert.equal(linked.segments[0].routeId,'a');
+    assert.deepEqual(linked.segments[0].stopIds,['from-l1','to']);
+    assert.equal(linked.segments[0].points.length,2,'the selected GTFS shape is clipped to the requested section');
   }finally{await vite.close()}
 });

@@ -116,7 +116,7 @@ test('Metrobús remains usable while live positions are pending and its route fo
       origin.focus();
     });
     await act(async () => {
-      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('Origen de prueba'));
+      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('Indios Verdes'));
       option.click();
     });
     assert.equal(calculate.disabled, true, 'a destination is still required');
@@ -124,11 +124,11 @@ test('Metrobús remains usable while live positions are pending and its route fo
       destination.focus();
     });
     await act(async () => {
-      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('Destino de prueba'));
+      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('El Caminero'));
       option.click();
     });
-    assert.equal(origin.value, 'Origen de prueba');
-    assert.equal(destination.value, 'Destino de prueba');
+    assert.equal(origin.value, 'Indios Verdes');
+    assert.equal(destination.value, 'El Caminero');
     assert.equal(calculate.disabled, false, 'the user can prepare a journey while live positions remain pending');
     assert.equal(livePending, true);
     assert.deepEqual(viewportPseudoOverlays(style.sheet, document.body), []);

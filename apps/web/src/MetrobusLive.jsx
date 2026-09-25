@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BusFront, Clock3, Download, Footprints, MapPin, Navigation, Route } from "lucide-react";
+import { metrobusStationLines, metrobusStations, planRoute } from "@meperdienelmetro/core";
 import OfflinePlanner from "./MetrobusPlanner";
 import MetrobusSelect from "./MetrobusSelect";
 
@@ -28,6 +29,95 @@ const clock = (value) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+
+const stationKey = (value = "") => value
+  .normalize("NFD")
+  .replace(/[\u0300-\u036f]/g, "")
+  .toLocaleLowerCase("es")
+  .replace(/\s+l[1-7](?:\s+(?:norte|sur|oriente|poniente|e\d+))?\.?$/i, "")
+  .replace(/[.'’]/g, "")
+  .replace(/\s+/g, " ")
+  .trim();
+
+const distance = ([lat, lng], point) => (lat - point[0]) ** 2 + (lng - point[1]) ** 2;
+
+function stationCandidates(network, name, lineId) {
+  const key = stationKey(name);
+  const matches = network.stops.filter((stop) => stationKey(stop.stop_name) === key);
+  const lineMatches = matches.filter((stop) => new RegExp(`(?:^|\\s)L${lineId}(?:\\s|\\.|$)`, "i").test(stop.stop_name));
+  return (lineMatches.length ? lineMatches : matches).map((stop) => ({
+    id: stop.stop_id,
+    point: [+stop.stop_lat, +stop.stop_lon],
+  }));
+}
+
+function closestIndex(points, candidates) {
+  let best = { index: -1, score: Infinity, stopId: null };
+  for (const candidate of candidates) {
+    for (let index = 0; index < points.length; index += 1) {
+      const score = distance(candidate.point, points[index]);
+      if (score < best.score) best = { index, score, stopId: candidate.id };
+    }
+  }
+  return best;
+}
+
+export function buildLiveJourney(routePlan, network, startedAt = Math.floor(Date.now() / 1000)) {
+  if (!routePlan) return { found: false, message: "No encontramos un recorrido entre esas estaciones." };
+  let elapsedMinutes = 0;
+  const segments = routePlan.segments.map((segment, segmentIndex) => {
+    const lineId = String(segment.line.id);
+    const fromName = segment.stations[0];
+    const toName = segment.stations.at(-1);
+    const fromCandidates = stationCandidates(network, fromName, lineId);
+    const toCandidates = stationCandidates(network, toName, lineId);
+    let selected = null;
+    for (const route of network.routes.filter((item) => String(item.route_short_name) === lineId)) {
+      for (const shapeId of route.shapeIds || []) {
+        const shape = network.shapes[shapeId] || [];
+        if (!shape.length || !fromCandidates.length || !toCandidates.length) continue;
+        const fromPoint = closestIndex(shape, fromCandidates);
+        const toPoint = closestIndex(shape, toCandidates);
+        const score = fromPoint.score + toPoint.score;
+        if (!selected || score < selected.score) selected = { route, shape, fromPoint, toPoint, score };
+      }
+    }
+    const rideMinutes = Math.max(2, (segment.stations.length - 1) * 2);
+    const departure = startedAt + elapsedMinutes * 60;
+    elapsedMinutes += rideMinutes;
+    const arrival = startedAt + elapsedMinutes * 60;
+    if (segmentIndex < routePlan.segments.length - 1) elapsedMinutes += 4;
+    let points = [];
+    let stopIds = [];
+    if (selected) {
+      const start = selected.fromPoint.index;
+      const end = selected.toPoint.index;
+      points = start <= end
+        ? selected.shape.slice(start, end + 1)
+        : selected.shape.slice(end, start + 1).reverse();
+      stopIds = [selected.fromPoint.stopId, selected.toPoint.stopId].filter(Boolean);
+    }
+    const route = selected?.route || network.routes.find((item) => String(item.route_short_name) === lineId) || {
+      route_id: `line-${lineId}`,
+      route_short_name: lineId,
+      route_long_name: `Línea ${lineId}`,
+      route_color: segment.line.color.replace("#", ""),
+    };
+    return {
+      kind: "ride", lineId, routeId: route.route_id, route, points, stopIds,
+      fromName, toName, departure, arrival, stations: segment.stations,
+    };
+  });
+  return {
+    found: true,
+    source: "local-live",
+    minutes: routePlan.minutes,
+    arrival: startedAt + routePlan.minutes * 60,
+    transfers: routePlan.transfers,
+    segments,
+  };
+}
+
 export function GeographicMap({ network, live, line, variant, journey }) {
   const [zoom, setZoom] = useState(1),
     [selected, setSelected] = useState(null);
@@ -41,9 +131,14 @@ export function GeographicMap({ network, live, line, variant, journey }) {
       ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => segment.routeId)
       : [],
   );
+  const journeyLineIds = new Set(
+    journey?.found
+      ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => String(segment.lineId || segment.route?.route_short_name || ""))
+      : [],
+  );
   const routes = network.routes.filter((route) =>
     journey?.found
-      ? journeyRouteIds.has(route.route_id)
+      ? journeyRouteIds.has(route.route_id) || journeyLineIds.has(String(route.route_short_name))
       : (!line || route.route_short_name === line) && (!variant || route.route_id === variant),
   );
   const routeIds = new Set(routes.map((r) => r.route_id));
@@ -54,7 +149,10 @@ export function GeographicMap({ network, live, line, variant, journey }) {
       color: "#" + r.route_color,
     })),
   );
-  const extent = paths.flatMap((p) => p.points);
+  const selectedJourneyPoints = journey?.found
+    ? journey.segments.filter((segment) => segment.kind === "ride").flatMap((segment) => segment.points || [])
+    : [];
+  const extent = selectedJourneyPoints.length ? selectedJourneyPoints : paths.flatMap((p) => p.points);
   const all = [
     ...(extent.length ? extent : Object.values(network.shapes).flat()),
     ...(!journey?.found && !line && !variant
@@ -67,13 +165,19 @@ export function GeographicMap({ network, live, line, variant, journey }) {
     Math.min(bounds[2], lng), Math.max(bounds[3], lng),
   ], [Infinity, -Infinity, Infinity, -Infinity]);
   const [minLat, maxLat, minLng, maxLng] = all.length ? extentBounds : [19.3, 19.5, -99.2, -99.1];
+  const latPadding = Math.max(0.003, (maxLat - minLat) * 0.08);
+  const lngPadding = Math.max(0.003, (maxLng - minLng) * 0.08);
+  const viewMinLat = selectedJourneyPoints.length ? minLat - latPadding : minLat;
+  const viewMaxLat = selectedJourneyPoints.length ? maxLat + latPadding : maxLat;
+  const viewMinLng = selectedJourneyPoints.length ? minLng - lngPadding : minLng;
+  const viewMaxLng = selectedJourneyPoints.length ? maxLng + lngPadding : maxLng;
   const scale = Math.min(
-    900 / (Math.max(0.001, maxLng - minLng) * Math.cos((19.4 * Math.PI) / 180)),
-    1000 / Math.max(0.001, maxLat - minLat),
+    900 / (Math.max(0.001, viewMaxLng - viewMinLng) * Math.cos((19.4 * Math.PI) / 180)),
+    1000 / Math.max(0.001, viewMaxLat - viewMinLat),
   );
   const point = ([lat, lng]) => [
-    50 + (lng - minLng) * Math.cos((19.4 * Math.PI) / 180) * scale,
-    50 + (maxLat - lat) * scale,
+    50 + (lng - viewMinLng) * Math.cos((19.4 * Math.PI) / 180) * scale,
+    50 + (viewMaxLat - lat) * scale,
   ];
   const points = (coordinates) =>
     coordinates.map((p) => point(p).join(",")).join(" ");
@@ -81,7 +185,11 @@ export function GeographicMap({ network, live, line, variant, journey }) {
     freshVehicles.filter(
       (v) =>
         (routeIds.has(v.routeId) || (!journey?.found && !line && !variant)) &&
-        Date.now() / 1000 - v.timestamp <= 120,
+        Date.now() / 1000 - v.timestamp <= 120 &&
+        (!selectedJourneyPoints.length || (
+          v.lat >= minLat - latPadding && v.lat <= maxLat + latPadding &&
+          v.lng >= minLng - lngPadding && v.lng <= maxLng + lngPadding
+        )),
     ) || [];
   const journeyStopIds = new Set(
     journey?.found ? journey.segments.flatMap((segment) => segment.stopIds || []) : [],
@@ -169,8 +277,8 @@ export function GeographicMap({ network, live, line, variant, journey }) {
               points={points(p.points)}
               fill="none"
               stroke={p.color}
-              strokeWidth="3"
-              opacity={journey?.found ? ".25" : ".7"}
+              strokeWidth={journey?.found ? "5" : "3"}
+              opacity={journey?.found ? ".82" : ".7"}
             />
           ))}
           {journey?.segments
@@ -178,20 +286,22 @@ export function GeographicMap({ network, live, line, variant, journey }) {
             .map((s, i) => (
               <polyline
                 key={i}
-                points={points(s.points)}
+                points={points(s.points || [])}
                 fill="none"
                 stroke={"#" + s.route.route_color}
-                strokeWidth="7"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             ))}
           {network.stops
             .filter(
               (s) =>
                 (!journey?.found || journeyStopIds.has(s.stop_id)) &&
-                +s.stop_lat >= minLat &&
-                +s.stop_lat <= maxLat &&
-                +s.stop_lon >= minLng &&
-                +s.stop_lon <= maxLng,
+                +s.stop_lat >= viewMinLat &&
+                +s.stop_lat <= viewMaxLat &&
+                +s.stop_lon >= viewMinLng &&
+                +s.stop_lon <= viewMaxLng,
             )
             .map((s) => {
               const [x, y] = point([+s.stop_lat, +s.stop_lon]);
@@ -228,12 +338,12 @@ export function GeographicMap({ network, live, line, variant, journey }) {
                 <circle
                   cx={x}
                   cy={y}
-                  r={selectedVehicle?.id === v.id ? "17" : "14"}
+                  r={selectedVehicle?.id === v.id ? "11" : "9"}
                   fill={"#" + (network.routes.find((route) => route.route_id === v.routeId)?.route_color || "162b45")}
                   stroke="white"
-                  strokeWidth="3"
+                  strokeWidth="2"
                 />
-                <BusFront x={x - 9} y={y - 9} width={18} height={18} color="white" strokeWidth={2} aria-hidden="true" />
+                <BusFront x={x - 6} y={y - 6} width={12} height={12} color="white" strokeWidth={2} aria-hidden="true" />
                 <title>{`Unidad ${v.label || v.id} - ${clock(v.timestamp)}`}</title>
               </g>
             );
@@ -306,29 +416,28 @@ function MetrobusLiveBackend({ mobile }) {
   }, [retryKey]);
   const error = networkError || liveError;
   const localNetwork = network?.source === "local";
-  const stops = useMemo(
-    () =>
-      network
-        ? [...network.stops].sort((a, b) =>
-            a.stop_name.localeCompare(b.stop_name, "es"),
-          )
-        : [],
-    [network],
-  );
-  async function calculate(e) {
+  const plannerStops = useMemo(() => metrobusStations.map((name) => ({
+    value: name,
+    label: name,
+    description: `Línea${metrobusStationLines(name).length === 1 ? "" : "s"} ${metrobusStationLines(name).map((item) => item.id).join(", ")}`,
+  })), []);
+  function calculate(e) {
     e.preventDefault();
     setBusy(true);
     setPlanError("");
     setJourney(null);
     try {
-      const result = await get("plan?" + new URLSearchParams({ from, to }));
+      const routePlan = planRoute({ transport: "metrobus", from, to }).routes[0] || null;
+      const result = buildLiveJourney(routePlan, network);
       setJourney(result);
       if (result.found) {
         setLine("");
         setVariant("");
+      } else {
+        setPlanError(result.message);
       }
     } catch (e) {
-      setPlanError(e.message);
+      setPlanError("No pudimos calcular ese recorrido. Intenta con otras estaciones.");
     } finally {
       setBusy(false);
     }
@@ -349,12 +458,13 @@ function MetrobusLiveBackend({ mobile }) {
               setNetworkError("");
               setLiveError("");
               setRetryKey(value => value + 1);
-            }}>Reintentar servicio en vivo <ArrowRight size={16} /></button>
+            }}>Con conexión <ArrowRight size={16} /></button>
           </div>
         ) : (
-          <button className="mb-return" onClick={() => setOffline(false)}>
-            Volver a recorridos y unidades en vivo
-          </button>
+          <div className="mb-mode-switch" aria-label="Modo del mapa">
+            <button type="button" onClick={() => setOffline(false)}>Con conexión</button>
+            <button type="button" className="active" aria-pressed="true">Sin conexión</button>
+          </div>
         )}
         <OfflinePlanner mobile={mobile} />
       </>
@@ -378,26 +488,23 @@ function MetrobusLiveBackend({ mobile }) {
           <span>{!network ? "Estamos preparando el mapa." : localNetwork ? "Rutas, estaciones y cálculo de trayectos listos." : !live || live.stale ? "Puedes consultar rutas y horarios mientras tanto." : `Última señal ${clock(live.timestamp)} · se actualiza automáticamente`}</span>
           {live?.error && <small>{live.error}</small>}
         </div>
-        <button onClick={() => setOffline(true)}>Planificador sin conexión <ArrowRight size={16} /></button>
+        <div className="mb-mode-switch" aria-label="Modo del mapa">
+          <button type="button" className="active" aria-pressed="true">Con conexión</button>
+          <button type="button" onClick={() => setOffline(true)}>Sin conexión</button>
+        </div>
       </div>
       {network && (
         <>
           <div className="workspace mb-live-workspace">
             <aside className="mb-live-sidebar">
-              {network.planningMode === 'offline' ? (
-                <div className="mb-plan-form">
-                  <div className="mb-panel-title"><span className="mb-panel-icon"><Route size={20} /></span><div><p className="eyebrow">PLANEA TU VIAJE</p><h2>¿A dónde vas?</h2></div></div>
-                  <p className="mb-planner-description">Calcula tu recorrido entre estaciones y consulta las unidades por línea en este mapa.</p>
-                  <button type="button" className="search-button" onClick={() => setOffline(true)}>Elegir origen y destino <ArrowRight size={18} /></button>
-                </div>
-              ) : <form className="mb-plan-form" onSubmit={calculate}>
+              <form className="mb-plan-form" onSubmit={calculate}>
                 <div className="mb-panel-title"><span className="mb-panel-icon"><Route size={20} /></span><div><p className="eyebrow">PLANEA TU VIAJE</p><h2>¿A dónde vas?</h2></div></div>
                 {[
                   ["Origen", from, setFrom],
                   ["Destino", to, setTo],
                 ].map(([label, value, set]) => (
                   <MetrobusSelect key={label} label={label} value={value} disabled={busy} icon={<MapPin size={18}/>}
-                    options={stops.map(s => ({value: s.stop_id, label: s.stop_name, description: s.stop_id}))}
+                    options={plannerStops}
                     onChange={next => {set(next); setJourney(null);}}/>
                 ))}
                 <p className="mb-departure"><Clock3 size={15} /> Salida ahora · hora de Ciudad de México</p>
@@ -409,7 +516,7 @@ function MetrobusLiveBackend({ mobile }) {
                   {busy ? "Calculando…" : <>Encontrar trayecto <ArrowRight size={18} /></>}
                 </button>
                 <p role="alert">{planError}</p>
-              </form>}
+              </form>
               {journey?.found ? <div className="mb-filter-panel mb-trip-filter"><p className="eyebrow">VISTA ACTIVA</p><strong>Solo tu trayecto</strong><p>El mapa muestra los recorridos y las unidades identificadas para las líneas de este viaje.</p><button type="button" onClick={() => { setJourney(null); setLine(""); setVariant(""); }}>Explorar toda la red <ArrowRight size={16} /></button></div> : <div className="mb-filter-panel"><p className="eyebrow">EXPLORA LA RED</p><h3>Filtra los recorridos</h3>
                 <MetrobusSelect label="Línea" value={line} icon={<BusFront size={18}/>}
                   options={[{value: '', label: 'Todas las líneas'}, ...[...new Set(network.routes.map(r => r.route_short_name))].sort().map(value => ({value, label: `Línea ${value}`, color: '#' + network.routes.find(r => r.route_short_name === value).route_color}))]}
@@ -431,8 +538,8 @@ function MetrobusLiveBackend({ mobile }) {
               {journey &&
                 (journey.found ? (
                   <div className="mb-journey">
-                    <div className="mb-journey-heading"><div><p className="eyebrow">TU VIAJE EN METROBÚS</p><h2>{network.stops.find((stop) => stop.stop_id === from)?.stop_name} <ArrowRight size={20} /> {network.stops.find((stop) => stop.stop_id === to)?.stop_name}</h2></div><span className="mb-schedule-label"><Clock3 size={15} /> {journey.source === "local" ? "Estimación local" : "Horario GTFS"}</span></div>
-                    <div className="mb-trip-stats"><div><strong>{journey.minutes}<small> min</small></strong><span>{journey.source === "local" ? "duración estimada" : "duración programada"}</span></div><div><strong>{clock(journey.arrival)}</strong><span>{journey.source === "local" ? "llegada estimada" : "llegada programada"}</span></div><div><strong>{journey.transfers}</strong><span>{journey.transfers === 1 ? "transbordo" : "transbordos"}</span></div></div>
+                    <div className="mb-journey-heading"><div><p className="eyebrow">TU VIAJE EN METROBÚS</p><h2>{from} <ArrowRight size={20} /> {to}</h2></div><span className="mb-schedule-label"><Clock3 size={15} /> Ruta estimada + unidades en vivo</span></div>
+                    <div className="mb-trip-stats"><div><strong>{journey.minutes}<small> min</small></strong><span>duración estimada</span></div><div><strong>{clock(journey.arrival)}</strong><span>llegada estimada</span></div><div><strong>{journey.transfers}</strong><span>{journey.transfers === 1 ? "transbordo" : "transbordos"}</span></div></div>
                     <div className="mb-steps-heading"><h3>Tu recorrido paso a paso</h3><span>{journey.segments.length} {journey.segments.length === 1 ? "tramo" : "tramos"}</span></div>
                     <ol className="mb-steps">
                       {journey.segments.map((segment, index) => (
@@ -442,7 +549,7 @@ function MetrobusLiveBackend({ mobile }) {
                         </li>
                       ))}
                     </ol>
-                    <p className="mb-schedule-note"><Clock3 size={16} /> {journey.source === "local" ? "Estimación de dos minutos por estación y cuatro por transbordo." : "Tiempo basado en horarios, incluida la espera. No es una predicción de llegada de una unidad."}</p>
+                    <p className="mb-schedule-note"><Clock3 size={16} /> El trayecto se calcula con la red de estaciones; las unidades mostradas sí provienen del servicio en tiempo real.</p>
                     {journey.walkingNote && <small className="mb-walking-note">{journey.walkingNote}</small>}
                   </div>
                 ) : (
