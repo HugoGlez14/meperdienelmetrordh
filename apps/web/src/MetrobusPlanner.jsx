@@ -1,12 +1,30 @@
 import React,{useMemo,useState} from 'react';
-import {ArrowRight,BusFront,Clock3,LocateFixed,MapPin} from 'lucide-react';
+import {ArrowRight,BusFront,ChevronDown,Clock3,LocateFixed,MapPin} from 'lucide-react';
 import MetrobusMap from './MetrobusMap';
 import RouteAudio from './RouteAudio';
 import {metrobusLines,metrobusStations,metrobusStationLines,planRoute} from '@meperdienelmetro/core';
 import {StationDetails,StationMark} from './StationDetails';
 
 function Badge({line}){return <span className="badge" style={{background:line.color}}>{line.id}</span>}
-function Pick({label,value,setValue,icon,mobile}){const [open,setOpen]=useState(false),[query,setQuery]=useState('');const openPicker=()=>{setQuery('');setOpen(true)};const results=metrobusStations.filter(station=>station.toLocaleLowerCase().includes(query.toLocaleLowerCase()));return <div className="picker"><label>{label}</label><div className="input-wrap">{icon}<input value={open?query:value} aria-label={label} readOnly={mobile} inputMode={mobile?'none':undefined} onClick={openPicker} onFocus={openPicker} onBlur={()=>!mobile&&setTimeout(()=>setOpen(false),150)} onChange={event=>{setQuery(event.target.value);setOpen(true)}}/><span>⌄</span></div>{open&&<div className={'options'+(mobile?' options-mobile':'')}>{mobile&&<div className="options-mobile-heading"><strong>{label}</strong><button type="button" onClick={()=>setOpen(false)}>Cerrar</button></div>}{results.map(station=><button key={station} type="button" onMouseDown={event=>event.preventDefault()} onClick={()=>{setValue(station);setQuery('');setOpen(false)}}><span>{station}</span><span>{metrobusStationLines(station).map(line=><Badge key={line.id} line={line}/>)}</span></button>)}</div>}</div>}
+function Pick({label,value,setValue,icon,mobile}){
+ const [open,setOpen]=useState(false),[query,setQuery]=useState('');
+ const openPicker=()=>{setQuery('');setOpen(true)};
+ const results=metrobusStations.filter(station=>station.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+ const selectedLines=value?metrobusStationLines(value):[];
+ return <div className="picker metrobus-picker">
+  <label>{label}</label>
+  <div className="input-wrap">
+   <span className="metrobus-picker-icon">{icon}</span>
+   <input value={open?query:value} placeholder="Selecciona una estación" aria-label={label} readOnly={mobile} inputMode={mobile?'none':undefined} onClick={openPicker} onFocus={openPicker} onBlur={()=>!mobile&&setTimeout(()=>setOpen(false),150)} onChange={event=>{setQuery(event.target.value);setOpen(true)}}/>
+   {!open&&selectedLines.length>0&&<span className="metrobus-picker-lines" aria-label={`Líneas ${selectedLines.map(line=>line.id).join(', ')}`}>{selectedLines.map(line=><Badge key={line.id} line={line}/>)}</span>}
+   <ChevronDown className={open?'open':''} size={18}/>
+  </div>
+  {open&&<div className={'options metrobus-options'+(mobile?' options-mobile':'')}>
+   {mobile&&<div className="options-mobile-heading"><strong>{label}</strong><button type="button" onClick={()=>setOpen(false)}>Cerrar</button></div>}
+   {results.length?results.map(station=><button key={station} type="button" onMouseDown={event=>event.preventDefault()} onClick={()=>{setValue(station);setQuery('');setOpen(false)}}><span>{station}</span><span>{metrobusStationLines(station).map(line=><Badge key={line.id} line={line}/>)}</span></button>):<p>No encontramos esa estación.</p>}
+  </div>}
+ </div>
+}
 
 export default function MetrobusPlanner({mobile}){
  const [from,setFrom]=useState(''),[to,setTo]=useState(''),[loading,setLoading]=useState(false),[trip,setTrip]=useState(null),[error,setError]=useState(''),[selectedStation,setSelectedStation]=useState(null);

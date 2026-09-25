@@ -137,3 +137,50 @@ test('Metrobús remains usable while live positions are pending and its route fo
     }
   }
 });
+
+test('Metrobús falls back to the bundled planner when the local API is unavailable', async () => {
+  const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>', {
+    url: 'http://127.0.0.1:5173/metrobus',
+    pretendToBeVisual: true,
+  });
+  const originals = new Map();
+  const expose = (key, value) => {
+    originals.set(key, Object.getOwnPropertyDescriptor(globalThis, key));
+    Object.defineProperty(globalThis, key, {configurable: true, writable: true, value});
+  };
+  let server, root;
+  try {
+    for (const key of ['window', 'document', 'navigator', 'HTMLElement', 'Node', 'Event']) expose(key, dom.window[key]);
+    expose('IS_REACT_ACT_ENVIRONMENT', true);
+    expose('fetch', async () => ({ok: false, status: 503, json: async () => ({})}));
+    server = await createServer({
+      root: fileURLToPath(new URL('../', import.meta.url)),
+      configFile: false,
+      server: {middlewareMode: true},
+      appType: 'custom',
+      optimizeDeps: {noDiscovery: true},
+    });
+    const {default: MetrobusLive} = await server.ssrLoadModule('/src/MetrobusLive.jsx');
+    const {createRoot} = await import('react-dom/client');
+    root = createRoot(dom.window.document.getElementById('root'));
+    await act(async () => {
+      root.render(React.createElement(MetrobusLive, {mobile: false}));
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+
+    const document = dom.window.document;
+    assert.match(document.body.textContent, /Planificador local activo/);
+    assert.doesNotMatch(document.body.textContent, /El servicio local de Metrobús no está disponible/);
+    assert.ok(document.querySelector('input[aria-label="Estoy en"]'));
+    assert.ok(document.querySelector('input[aria-label="Quiero ir a"]'));
+    assert.ok(document.querySelector('.mb-map svg'), 'the bundled schematic map must be visible');
+  } finally {
+    if (root) await act(async () => root.unmount());
+    if (server) await server.close();
+    dom.window.close();
+    for (const [key, descriptor] of originals) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
+});

@@ -25,6 +25,16 @@ La configuración de despliegue del monorepo está en `/vercel.json`. El cálcul
 
 ## Rutas y datos
 
+En desarrollo, Vite incluye una API local con las siete líneas, estaciones y
+cálculo de rutas, por lo que la vista de Metrobús funciona sin Python, MySQL ni
+credenciales. Para usar el backend GTFS completo, crea `apps/web/.env` y define
+`METROBUS_API_TARGET=http://127.0.0.1:8787`; ese modo añade horarios y posiciones
+cuando `apps/api/server.py` está configurado y en ejecución.
+
+En producción, la vista usa de forma predeterminada el planificador offline y
+no requiere base de datos. El modo GTFS en vivo es opcional y se habilita con
+`VITE_METROBUS_LIVE_ENABLED=true` junto con `METROBUS_API_TARGET`.
+
 `packages/core` contiene las estaciones y el algoritmo Dijkstra compartido con la aplicación móvil. Los transbordos se modelan como cambios de línea en estaciones compartidas. El modo menor tiempo usa 2 minutos por tramo y 5 por transbordo. El modo menos cambios prioriza el número de transbordos y después los tramos. No incluye espera, afluencia, cierres, accesibilidad ni tiempos reales; se debe verificar la operación antes de viajar.
 
 Referencia pública: https://www.metro.cdmx.gob.mx/la-red/mapa-de-la-red

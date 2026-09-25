@@ -30,6 +30,7 @@ const clock = (value) =>
 export function GeographicMap({ network, live, line, variant, journey }) {
   const [zoom, setZoom] = useState(1),
     [selected, setSelected] = useState(null);
+  const local = network.source === "local";
   const journeyRouteIds = new Set(
     journey?.found
       ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => segment.routeId)
@@ -116,8 +117,8 @@ export function GeographicMap({ network, live, line, variant, journey }) {
         <div className="mb-map-heading">
           <span className="mb-map-heading-icon"><Navigation size={19} /></span>
           <div>
-            <p className="eyebrow">MAPA EN VIVO</p>
-            <h3>{journey?.found ? "Unidades de tu trayecto" : "Recorridos de Metrobús"}</h3>
+            <p className="eyebrow">{local ? "MAPA LOCAL" : "MAPA EN VIVO"}</p>
+            <h3>{local ? "Recorridos de Metrobús" : journey?.found ? "Unidades de tu trayecto" : "Recorridos de Metrobús"}</h3>
           </div>
         </div>
         <span className="mb-map-count"><BusFront size={17} /> {vehicles.length} unidades recientes</span>
@@ -240,19 +241,21 @@ export function GeographicMap({ network, live, line, variant, journey }) {
         </div>
       )}
       <p className="mb-map-note">
-        Posiciones recibidas en los últimos 2 minutos. Toca una unidad para ver su información.
+        {local ? "Mapa esquemático incluido en la aplicación." : "Posiciones recibidas en los últimos 2 minutos. Toca una unidad para ver su información."}
         {journey?.found && " El tiempo de llegada del viaje procede del horario, no de la ubicación de la unidad."}
       </p>
     </section>
   );
 }
 
-export default function MetrobusLive({ mobile }) {
+function MetrobusLiveBackend({ mobile }) {
   const [network, setNetwork] = useState(null),
     [live, setLive] = useState(null),
     [networkError, setNetworkError] = useState(""),
     [liveError, setLiveError] = useState(""),
     [offline, setOffline] = useState(false),
+    [automaticFallback, setAutomaticFallback] = useState(false),
+    [retryKey, setRetryKey] = useState(0),
     [line, setLine] = useState("1"),
     [variant, setVariant] = useState(""),
     [from, setFrom] = useState(""),
@@ -279,7 +282,11 @@ export default function MetrobusLive({ mobile }) {
           networkLoaded = true;
           setNetworkError("");
         }).catch(error => {
-          if (!controller.signal.aborted) setNetworkError(error.message);
+          if (!controller.signal.aborted) {
+            setNetworkError(error.message);
+            setAutomaticFallback(true);
+            setOffline(true);
+          }
         }),
       );
       await Promise.allSettled(tasks);
@@ -290,8 +297,9 @@ export default function MetrobusLive({ mobile }) {
       controller.abort();
       clearTimeout(timer);
     };
-  }, []);
+  }, [retryKey]);
   const error = networkError || liveError;
+  const localNetwork = network?.source === "local";
   const stops = useMemo(
     () =>
       network
@@ -322,9 +330,26 @@ export default function MetrobusLive({ mobile }) {
   if (offline)
     return (
       <>
-        <button className="mb-return" onClick={() => setOffline(false)}>
-          Volver a recorridos y unidades en vivo
-        </button>
+        {automaticFallback ? (
+          <div className="mb-live-status mb-offline-status" role="status">
+            <span className="mb-status-dot mb-status-dot-muted" aria-hidden="true" />
+            <div className="mb-live-status-copy">
+              <strong>Planificador local activo</strong>
+              <span>Las rutas y el mapa funcionan sin el servicio en vivo.</span>
+            </div>
+            <button onClick={() => {
+              setOffline(false);
+              setAutomaticFallback(false);
+              setNetworkError("");
+              setLiveError("");
+              setRetryKey(value => value + 1);
+            }}>Reintentar servicio en vivo <ArrowRight size={16} /></button>
+          </div>
+        ) : (
+          <button className="mb-return" onClick={() => setOffline(false)}>
+            Volver a recorridos y unidades en vivo
+          </button>
+        )}
         <OfflinePlanner mobile={mobile} />
       </>
     );
@@ -343,8 +368,8 @@ export default function MetrobusLive({ mobile }) {
       <div className="mb-live-status" role="status">
         <span className={"mb-status-dot" + (error || !live || live.stale ? " mb-status-dot-muted" : "")} aria-hidden="true" />
         <div className="mb-live-status-copy">
-          <strong>{error || (!network ? "Cargando recorridos…" : !live || live.stale ? "Sin posiciones recientes" : "Unidades actualizadas")}</strong>
-          <span>{!network ? "Estamos preparando el mapa." : !live || live.stale ? "Puedes consultar rutas y horarios mientras tanto." : `Última señal ${clock(live.timestamp)} · se actualiza automáticamente`}</span>
+          <strong>{error || (!network ? "Cargando recorridos…" : localNetwork ? "Servicio local disponible" : !live || live.stale ? "Sin posiciones recientes" : "Unidades actualizadas")}</strong>
+          <span>{!network ? "Estamos preparando el mapa." : localNetwork ? "Rutas, estaciones y cálculo de trayectos listos." : !live || live.stale ? "Puedes consultar rutas y horarios mientras tanto." : `Última señal ${clock(live.timestamp)} · se actualiza automáticamente`}</span>
           {live?.error && <small>{live.error}</small>}
         </div>
         <button onClick={() => setOffline(true)}>Planificador sin conexión <ArrowRight size={16} /></button>
@@ -422,21 +447,21 @@ export default function MetrobusLive({ mobile }) {
                     ))}
                 </select>
               </label></div>}
-              <div className="mb-downloads">
+              {!localNetwork && <div className="mb-downloads">
                 <a href="/api/metrobus/download/static">
                   <Download size={15} /> Datos de rutas GTFS
                 </a>
                 <a href="/api/metrobus/download/realtime">
                   <Download size={15} /> Últimas posiciones
                 </a>
-              </div>
+              </div>}
             </aside>
             <section className="result metrobus-result">
               {journey &&
                 (journey.found ? (
                   <div className="mb-journey">
-                    <div className="mb-journey-heading"><div><p className="eyebrow">TU VIAJE EN METROBÚS</p><h2>{network.stops.find((stop) => stop.stop_id === from)?.stop_name} <ArrowRight size={20} /> {network.stops.find((stop) => stop.stop_id === to)?.stop_name}</h2></div><span className="mb-schedule-label"><Clock3 size={15} /> Horario GTFS</span></div>
-                    <div className="mb-trip-stats"><div><strong>{journey.minutes}<small> min</small></strong><span>duración programada</span></div><div><strong>{clock(journey.arrival)}</strong><span>llegada programada</span></div><div><strong>{journey.transfers}</strong><span>{journey.transfers === 1 ? "transbordo" : "transbordos"}</span></div></div>
+                    <div className="mb-journey-heading"><div><p className="eyebrow">TU VIAJE EN METROBÚS</p><h2>{network.stops.find((stop) => stop.stop_id === from)?.stop_name} <ArrowRight size={20} /> {network.stops.find((stop) => stop.stop_id === to)?.stop_name}</h2></div><span className="mb-schedule-label"><Clock3 size={15} /> {journey.source === "local" ? "Estimación local" : "Horario GTFS"}</span></div>
+                    <div className="mb-trip-stats"><div><strong>{journey.minutes}<small> min</small></strong><span>{journey.source === "local" ? "duración estimada" : "duración programada"}</span></div><div><strong>{clock(journey.arrival)}</strong><span>{journey.source === "local" ? "llegada estimada" : "llegada programada"}</span></div><div><strong>{journey.transfers}</strong><span>{journey.transfers === 1 ? "transbordo" : "transbordos"}</span></div></div>
                     <div className="mb-steps-heading"><h3>Tu recorrido paso a paso</h3><span>{journey.segments.length} {journey.segments.length === 1 ? "tramo" : "tramos"}</span></div>
                     <ol className="mb-steps">
                       {journey.segments.map((segment, index) => (
@@ -446,24 +471,23 @@ export default function MetrobusLive({ mobile }) {
                         </li>
                       ))}
                     </ol>
-                    <p className="mb-schedule-note"><Clock3 size={16} /> Tiempo basado en horarios, incluida la espera. No es una predicción de llegada de una unidad.</p>
+                    <p className="mb-schedule-note"><Clock3 size={16} /> {journey.source === "local" ? "Estimación de dos minutos por estación y cuatro por transbordo." : "Tiempo basado en horarios, incluida la espera. No es una predicción de llegada de una unidad."}</p>
                     {journey.walkingNote && <small className="mb-walking-note">{journey.walkingNote}</small>}
                   </div>
                 ) : (
                   <div className="mb-no-journey" role="status"><Route size={25} /><strong>Sin viaje programado</strong><p>{journey.message}</p></div>
                 ))}
               {!journey && <div className="mb-map-intro"><span className="mb-map-intro-icon"><BusFront size={22} /></span><div><h2>Explora el Metrobús en vivo</h2><p>Elige dos estaciones para destacar tu viaje y ver solo las unidades que circulan por sus rutas.</p></div></div>}
-              <GeographicMap
-                network={network}
-                live={error ? { ...live, vehicles: [] } : live}
-                line={line}
-                variant={variant}
-                journey={journey}
-              />
+              <GeographicMap network={network} live={error ? { ...live, vehicles: [] } : live} line={line} variant={variant} journey={journey} />
             </section>
           </div>
         </>
       )}
     </section>
   );
+}
+
+export default function MetrobusLive({ mobile }) {
+  const liveEnabled = import.meta.env.DEV || import.meta.env.VITE_METROBUS_LIVE_ENABLED === "true";
+  return liveEnabled ? <MetrobusLiveBackend mobile={mobile} /> : <OfflinePlanner mobile={mobile} />;
 }
