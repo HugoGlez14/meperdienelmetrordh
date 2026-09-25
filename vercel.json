@@ -2,7 +2,9 @@
   "buildCommand": "npm run build:web",
   "outputDirectory": "apps/web/dist",
   "framework": "vite",
+  "functions": { "api/metrobus.mjs": { "maxDuration": 60 } },
   "rewrites": [
+    { "source": "/api/metrobus/:endpoint", "destination": "/api/metrobus?endpoint=:endpoint" },
     { "source": "/metrobus", "destination": "/index.html" }
   ]
 }

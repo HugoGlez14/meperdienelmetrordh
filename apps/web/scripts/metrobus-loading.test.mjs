@@ -94,7 +94,7 @@ test('Metrobús remains usable while live positions are pending and its route fo
     assert.equal(livePending, true, 'this scenario must not wait for live positions to finish');
     const document = dom.window.document;
     assert.ok(document.querySelector('.mb-map svg polyline'), 'static routes render while live positions are pending');
-    const [origin, destination] = document.querySelectorAll('form select');
+    const [origin, destination] = document.querySelectorAll('form input[role="combobox"]');
     assert.ok(origin && destination, 'both stop selectors must render');
     assert.equal(origin.disabled, false);
     assert.equal(destination.disabled, false);
@@ -113,16 +113,22 @@ test('Metrobús remains usable while live positions are pending and its route fo
     control.remove();
 
     await act(async () => {
-      origin.value = 'a';
-      origin.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+      origin.focus();
+    });
+    await act(async () => {
+      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('Origen de prueba'));
+      option.click();
     });
     assert.equal(calculate.disabled, true, 'a destination is still required');
     await act(async () => {
-      destination.value = 'b';
-      destination.dispatchEvent(new dom.window.Event('change', {bubbles: true}));
+      destination.focus();
     });
-    assert.equal(origin.value, 'a');
-    assert.equal(destination.value, 'b');
+    await act(async () => {
+      const option = [...document.querySelectorAll('[role="option"]')].find(element => element.textContent.includes('Destino de prueba'));
+      option.click();
+    });
+    assert.equal(origin.value, 'Origen de prueba');
+    assert.equal(destination.value, 'Destino de prueba');
     assert.equal(calculate.disabled, false, 'the user can prepare a journey while live positions remain pending');
     assert.equal(livePending, true);
     assert.deepEqual(viewportPseudoOverlays(style.sheet, document.body), []);

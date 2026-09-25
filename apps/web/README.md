@@ -31,9 +31,30 @@ credenciales. Para usar el backend GTFS completo, crea `apps/web/.env` y define
 `METROBUS_API_TARGET=http://127.0.0.1:8787`; ese modo añade horarios y posiciones
 cuando `apps/api/server.py` está configurado y en ejecución.
 
-En producción, la vista usa de forma predeterminada el planificador offline y
-no requiere base de datos. El modo GTFS en vivo es opcional y se habilita con
-`VITE_METROBUS_LIVE_ENABLED=true` junto con `METROBUS_API_TARGET`.
+En producción, la vista consulta `/api/metrobus/network` y `/api/metrobus/live`
+mediante una función de Vercel. Configura `METROBUS_USER` y `METROBUS_PASSWORD`
+en las variables de entorno **Production** del proyecto y vuelve a desplegar.
+Se utiliza el proveedor Sinóptico configurado en `apps/api/server.py`. Nunca
+uses el prefijo `VITE_` en estas credenciales: no deben llegar al navegador.
+
+La función descarga los trazos GTFS reales y decodifica las posiciones de
+unidades. Se consulta cada 30 segundos y solo se muestran unidades con una
+posición de menos de dos minutos. La caché en memoria reutiliza la sesión por
+7 minutos, el mapa por una hora y las posiciones por 20 segundos dentro de cada
+instancia de Vercel; un arranque en frío vuelve a descargarlos. No necesita
+MySQL ni una base de datos. El feed real todavía debe verificarse con las
+credenciales del proyecto: feeds comprimidos de más de 32 MiB o redes que
+superen 4 MB en JSON requieren almacenamiento/caché externo.
+
+El botón **Elegir origen y destino** abre el planificador de estaciones con
+tiempos estimados, sin horarios GTFS ni predicciones de llegada. Si falla el
+proveedor, el planificador sigue disponible con opción para reintentar.
+
+Si ya tienes un backend Python completo alojado, puedes configurar en su lugar
+`METROBUS_API_TARGET=https://tu-backend.example` (el origen, sin ruta). La función
+reenviará únicamente las consultas de red, posiciones y planificación. El
+token opcional `METROBUS_API_TOKEN` se envía solo a ese backend. El proxy de Vite
+se usa únicamente en desarrollo; no constituye un backend de producción.
 
 `packages/core` contiene las estaciones y el algoritmo Dijkstra compartido con la aplicación móvil. Los transbordos se modelan como cambios de línea en estaciones compartidas. El modo menor tiempo usa 2 minutos por tramo y 5 por transbordo. El modo menos cambios prioriza el número de transbordos y después los tramos. No incluye espera, afluencia, cierres, accesibilidad ni tiempos reales; se debe verificar la operación antes de viajar.
 

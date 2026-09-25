@@ -7,10 +7,13 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "node --test --experimental-test-isolation=none src/map-layout.test.js scripts/metrobus-loading.test.mjs scripts/metrobus-local-api.test.mjs scripts/metrobus-route-filter.test.mjs"
+    "test": "node --test --experimental-test-isolation=none src/map-layout.test.js scripts/metrobus-loading.test.mjs scripts/metrobus-local-api.test.mjs scripts/metrobus-provider.test.mjs scripts/metrobus-route-filter.test.mjs"
   },
   "dependencies": {
     "@meperdienelmetro/core": "*",
+    "csv-parse": "^7.0.2",
+    "fflate": "^0.8.3",
+    "gtfs-realtime-bindings": "^2.2.0",
     "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"

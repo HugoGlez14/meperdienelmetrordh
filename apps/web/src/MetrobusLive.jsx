@@ -1,16 +1,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BusFront, Clock3, Download, Footprints, MapPin, Navigation, Route } from "lucide-react";
 import OfflinePlanner from "./MetrobusPlanner";
+import MetrobusSelect from "./MetrobusSelect";
 
 async function get(path, signal) {
   const request = new AbortController();
   const abort = () => request.abort();
   if (signal?.aborted) abort();
   signal?.addEventListener("abort", abort, { once: true });
-  const timeout = setTimeout(abort, path.startsWith("plan?") ? 30000 : 10000);
+  const timeout = setTimeout(abort, path === 'network' ? 45000 : path.startsWith("plan?") ? 30000 : 10000);
   try {
     const response = await fetch("/api/metrobus/" + path, { signal: request.signal });
-    if (!response.ok) throw new Error("El servicio local de Metrobús no está disponible.");
+    if (!response.ok) throw new Error("Las posiciones en vivo no están disponibles en este momento.");
     return await response.json();
   } catch (error) {
     if (request.signal.aborted && !signal?.aborted)
@@ -31,6 +32,10 @@ export function GeographicMap({ network, live, line, variant, journey }) {
   const [zoom, setZoom] = useState(1),
     [selected, setSelected] = useState(null);
   const local = network.source === "local";
+  const now = Date.now() / 1000;
+  const freshVehicles = (live?.vehicles || []).filter(v =>
+    Number.isFinite(v.lat) && Number.isFinite(v.lng) && v.timestamp > 0 && now - v.timestamp <= 120 && v.timestamp <= now + 30,
+  );
   const journeyRouteIds = new Set(
     journey?.found
       ? journey.segments.filter((segment) => segment.kind === "ride").map((segment) => segment.routeId)
@@ -53,15 +58,15 @@ export function GeographicMap({ network, live, line, variant, journey }) {
   const all = [
     ...(extent.length ? extent : Object.values(network.shapes).flat()),
     ...(!journey?.found && !line && !variant
-      ? (live?.vehicles || [])
-          .filter((v) => Date.now() / 1000 - v.timestamp <= 120)
+      ? freshVehicles
           .map((v) => [v.lat, v.lng])
       : []),
   ];
-  const minLat = Math.min(...all.map((p) => p[0])),
-    maxLat = Math.max(...all.map((p) => p[0])),
-    minLng = Math.min(...all.map((p) => p[1])),
-    maxLng = Math.max(...all.map((p) => p[1]));
+  const extentBounds = all.reduce((bounds, [lat, lng]) => [
+    Math.min(bounds[0], lat), Math.max(bounds[1], lat),
+    Math.min(bounds[2], lng), Math.max(bounds[3], lng),
+  ], [Infinity, -Infinity, Infinity, -Infinity]);
+  const [minLat, maxLat, minLng, maxLng] = all.length ? extentBounds : [19.3, 19.5, -99.2, -99.1];
   const scale = Math.min(
     900 / (Math.max(0.001, maxLng - minLng) * Math.cos((19.4 * Math.PI) / 180)),
     1000 / Math.max(0.001, maxLat - minLat),
@@ -73,7 +78,7 @@ export function GeographicMap({ network, live, line, variant, journey }) {
   const points = (coordinates) =>
     coordinates.map((p) => point(p).join(",")).join(" ");
   const vehicles =
-    live?.vehicles.filter(
+    freshVehicles.filter(
       (v) =>
         (routeIds.has(v.routeId) || (!journey?.found && !line && !variant)) &&
         Date.now() / 1000 - v.timestamp <= 120,
@@ -223,11 +228,12 @@ export function GeographicMap({ network, live, line, variant, journey }) {
                 <circle
                   cx={x}
                   cy={y}
-                  r={selectedVehicle?.id === v.id ? "9" : "7"}
+                  r={selectedVehicle?.id === v.id ? "17" : "14"}
                   fill={"#" + (network.routes.find((route) => route.route_id === v.routeId)?.route_color || "162b45")}
                   stroke="white"
                   strokeWidth="3"
                 />
+                <BusFront x={x - 9} y={y - 9} width={18} height={18} color="white" strokeWidth={2} aria-hidden="true" />
                 <title>{`Unidad ${v.label || v.id} - ${clock(v.timestamp)}`}</title>
               </g>
             );
@@ -242,7 +248,7 @@ export function GeographicMap({ network, live, line, variant, journey }) {
       )}
       <p className="mb-map-note">
         {local ? "Mapa esquemático incluido en la aplicación." : "Posiciones recibidas en los últimos 2 minutos. Toca una unidad para ver su información."}
-        {journey?.found && " El tiempo de llegada del viaje procede del horario, no de la ubicación de la unidad."}
+        {journey?.found && !local && " El tiempo de llegada del viaje procede del horario, no de la ubicación de la unidad."}
       </p>
     </section>
   );
@@ -256,7 +262,7 @@ function MetrobusLiveBackend({ mobile }) {
     [offline, setOffline] = useState(false),
     [automaticFallback, setAutomaticFallback] = useState(false),
     [retryKey, setRetryKey] = useState(0),
-    [line, setLine] = useState("1"),
+    [line, setLine] = useState(""),
     [variant, setVariant] = useState(""),
     [from, setFrom] = useState(""),
     [to, setTo] = useState(""),
@@ -334,8 +340,8 @@ function MetrobusLiveBackend({ mobile }) {
           <div className="mb-live-status mb-offline-status" role="status">
             <span className="mb-status-dot mb-status-dot-muted" aria-hidden="true" />
             <div className="mb-live-status-copy">
-              <strong>Planificador local activo</strong>
-              <span>Las rutas y el mapa funcionan sin el servicio en vivo.</span>
+              <strong>Tiempo real no disponible · Planificador local activo</strong>
+              <span>Puedes calcular tu recorrido mientras se restablecen las posiciones de las unidades.</span>
             </div>
             <button onClick={() => {
               setOffline(false);
@@ -378,31 +384,21 @@ function MetrobusLiveBackend({ mobile }) {
         <>
           <div className="workspace mb-live-workspace">
             <aside className="mb-live-sidebar">
-              <form className="mb-plan-form" onSubmit={calculate}>
+              {network.planningMode === 'offline' ? (
+                <div className="mb-plan-form">
+                  <div className="mb-panel-title"><span className="mb-panel-icon"><Route size={20} /></span><div><p className="eyebrow">PLANEA TU VIAJE</p><h2>¿A dónde vas?</h2></div></div>
+                  <p className="mb-planner-description">Calcula tu recorrido entre estaciones y consulta las unidades por línea en este mapa.</p>
+                  <button type="button" className="search-button" onClick={() => setOffline(true)}>Elegir origen y destino <ArrowRight size={18} /></button>
+                </div>
+              ) : <form className="mb-plan-form" onSubmit={calculate}>
                 <div className="mb-panel-title"><span className="mb-panel-icon"><Route size={20} /></span><div><p className="eyebrow">PLANEA TU VIAJE</p><h2>¿A dónde vas?</h2></div></div>
                 {[
                   ["Origen", from, setFrom],
                   ["Destino", to, setTo],
                 ].map(([label, value, set]) => (
-                  <label className="mb-field" key={label}>
-                    <span><MapPin size={15} /> {label}</span>
-                    <select
-                      required
-                      disabled={busy}
-                      value={value}
-                      onChange={(e) => {
-                        set(e.target.value);
-                        setJourney(null);
-                      }}
-                    >
-                      <option value="">Selecciona una parada</option>
-                      {stops.map((s) => (
-                        <option key={s.stop_id} value={s.stop_id}>
-                          {s.stop_name} · {s.stop_id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <MetrobusSelect key={label} label={label} value={value} disabled={busy} icon={<MapPin size={18}/>}
+                    options={stops.map(s => ({value: s.stop_id, label: s.stop_name, description: s.stop_id}))}
+                    onChange={next => {set(next); setJourney(null);}}/>
                 ))}
                 <p className="mb-departure"><Clock3 size={15} /> Salida ahora · hora de Ciudad de México</p>
                 <button
@@ -413,41 +409,16 @@ function MetrobusLiveBackend({ mobile }) {
                   {busy ? "Calculando…" : <>Encontrar trayecto <ArrowRight size={18} /></>}
                 </button>
                 <p role="alert">{planError}</p>
-              </form>
-              {journey?.found ? <div className="mb-filter-panel mb-trip-filter"><p className="eyebrow">VISTA ACTIVA</p><strong>Solo tu trayecto</strong><p>El mapa muestra los recorridos y las unidades identificadas para las líneas de este viaje.</p><button type="button" onClick={() => { setJourney(null); setLine(""); setVariant(""); }}>Explorar toda la red <ArrowRight size={16} /></button></div> : <div className="mb-filter-panel"><p className="eyebrow">EXPLORA LA RED</p><h3>Filtra los recorridos</h3><label className="mb-field">
-                Línea
-                <select
-                  value={line}
-                  onChange={(e) => {
-                    setLine(e.target.value);
-                    setVariant("");
-                  }}
-                >
-                  <option value="">Todas</option>
-                  {[...new Set(network.routes.map((r) => r.route_short_name))]
-                    .sort()
-                    .map((l) => (
-                      <option key={l}>{l}</option>
-                    ))}
-                </select>
-              </label>
-              <label className="mb-field">
-                Recorrido y sentido
-                <select
-                  value={variant}
-                  onChange={(e) => setVariant(e.target.value)}
-                >
-                  <option value="">Todos los recorridos</option>
-                  {network.routes
-                    .filter((r) => !line || r.route_short_name === line)
-                    .map((r) => (
-                      <option key={r.route_id} value={r.route_id}>
-                        {r.route_long_name}
-                      </option>
-                    ))}
-                </select>
-              </label></div>}
-              {!localNetwork && <div className="mb-downloads">
+              </form>}
+              {journey?.found ? <div className="mb-filter-panel mb-trip-filter"><p className="eyebrow">VISTA ACTIVA</p><strong>Solo tu trayecto</strong><p>El mapa muestra los recorridos y las unidades identificadas para las líneas de este viaje.</p><button type="button" onClick={() => { setJourney(null); setLine(""); setVariant(""); }}>Explorar toda la red <ArrowRight size={16} /></button></div> : <div className="mb-filter-panel"><p className="eyebrow">EXPLORA LA RED</p><h3>Filtra los recorridos</h3>
+                <MetrobusSelect label="Línea" value={line} icon={<BusFront size={18}/>}
+                  options={[{value: '', label: 'Todas las líneas'}, ...[...new Set(network.routes.map(r => r.route_short_name))].sort().map(value => ({value, label: `Línea ${value}`, color: '#' + network.routes.find(r => r.route_short_name === value).route_color}))]}
+                  onChange={value => {setLine(value); setVariant('');}}/>
+                <MetrobusSelect label="Recorrido y sentido" value={variant} icon={<Navigation size={18}/>}
+                  options={[{value: '', label: 'Todos los recorridos'}, ...network.routes.filter(r => !line || r.route_short_name === line).map(r => ({value: r.route_id, label: r.route_long_name, color: '#' + r.route_color}))]}
+                  onChange={setVariant}/>
+              </div>}
+              {!localNetwork && import.meta.env.DEV && network.planningMode !== 'offline' && <div className="mb-downloads">
                 <a href="/api/metrobus/download/static">
                   <Download size={15} /> Datos de rutas GTFS
                 </a>
@@ -477,7 +448,7 @@ function MetrobusLiveBackend({ mobile }) {
                 ) : (
                   <div className="mb-no-journey" role="status"><Route size={25} /><strong>Sin viaje programado</strong><p>{journey.message}</p></div>
                 ))}
-              {!journey && <div className="mb-map-intro"><span className="mb-map-intro-icon"><BusFront size={22} /></span><div><h2>Explora el Metrobús en vivo</h2><p>Elige dos estaciones para destacar tu viaje y ver solo las unidades que circulan por sus rutas.</p></div></div>}
+              {!journey && <div className="mb-map-intro"><span className="mb-map-intro-icon"><BusFront size={22} /></span><div><h2>Explora el Metrobús en vivo</h2><p>Filtra por línea y recorrido. Toca un camioncito para consultar su última posición.</p></div></div>}
               <GeographicMap network={network} live={error ? { ...live, vehicles: [] } : live} line={line} variant={variant} journey={journey} />
             </section>
           </div>
@@ -488,6 +459,5 @@ function MetrobusLiveBackend({ mobile }) {
 }
 
 export default function MetrobusLive({ mobile }) {
-  const liveEnabled = import.meta.env.DEV || import.meta.env.VITE_METROBUS_LIVE_ENABLED === "true";
-  return liveEnabled ? <MetrobusLiveBackend mobile={mobile} /> : <OfflinePlanner mobile={mobile} />;
+  return <MetrobusLiveBackend mobile={mobile} />;
 }
